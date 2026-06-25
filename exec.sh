@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+# dev-sandbox directory
+sandbox_dir=$(dirname $(readlink -f $0))
+
+# target 
+target_dir=$(readlink -f $(pwd))
+target_name=$(basename $target_dir)
+
+# name
+name="dev-sandbox-$target_name"
+
+cd $sandbox_dir
+
+podman exec -it $name "$@"
+

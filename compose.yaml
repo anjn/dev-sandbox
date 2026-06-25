@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  dev:
+    container_name: ${CONTAINER_NAME}
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: dev-sandbox
+    command: bash
+    mem_limit: 64g
+    memswap_limit: 64g
+    working_dir: /workspace
+    userns_mode: keep-id
+    ipc: host
+    security_opt:
+      - seccomp=unconfined
+    group_add:
+      - keep-groups
+    devices:
+      - /dev/kfd
+      - /dev/dri/renderD128
+      - /dev/snd
+    volumes:
+      - ${WORKSPACE_DIR}:/workspace
+      - ${HOME}/.codex:/home/ubuntu/.codex
+    environment:
+      - TZ=Asia/Tokyo
+      - LANG=ja_JP.UTF-8
+      - LC_CTYPE=ja_JP.UTF-8
+    network_mode: host
+    stdin_open: true
+    tty: true
+
