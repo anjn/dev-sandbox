@@ -16,10 +16,13 @@ RUN apt-get update && \
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
     alsa-utils \
+    bubblewrap \
     build-essential \
     cmake \
     ffmpeg \
     gdb \
+    gh \
+    git-lfs \
     jq \
     libasound2-dev \
     locales \
