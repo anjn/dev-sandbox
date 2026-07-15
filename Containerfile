@@ -1,6 +1,11 @@
-FROM docker.io/rocm/pytorch:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0
+ARG BASE_IMAGE=docker.io/rocm/pytorch:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0
+FROM ${BASE_IMAGE}
 
 USER root
+
+RUN getent group ubuntu >/dev/null || groupadd --gid 1000 ubuntu; \
+    id --user ubuntu >/dev/null 2>&1 || \
+        useradd --uid 1000 --gid ubuntu --create-home --shell /bin/bash ubuntu
 
 # Timezone
 ENV TZ=Asia/Tokyo
@@ -18,7 +23,9 @@ RUN apt-get update && \
     alsa-utils \
     bubblewrap \
     build-essential \
+    ca-certificates \
     cmake \
+    curl \
     ffmpeg \
     gdb \
     gh \
@@ -55,4 +62,3 @@ RUN curl -fsSL https://bun.sh/install | bash
 RUN curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
 RUN curl -fsSL https://opencode.ai/install | bash
 RUN curl -fsSL https://claude.ai/install.sh | bash
-

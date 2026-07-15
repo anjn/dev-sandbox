@@ -1,21 +1,16 @@
 #!/usr/bin/env bash
 
-# dev-sandbox directory
-sandbox_dir=$(dirname $(readlink -f $0))
+set -euo pipefail
 
-# target 
-target_dir=$(readlink -f $(pwd))
-target_name=$(basename $target_dir)
+source "$(dirname -- "$(readlink -f -- "$0")")/lib/sandbox.sh"
 
-# name
-name="dev-sandbox-$target_name"
+platform=$(sandbox_resolve_platform)
 
-cd $sandbox_dir
+sandbox_require_commands podman podman-compose
+if [[ $platform == jetson ]]; then
+    sandbox_check_jetson_cdi
+fi
 
-CONTAINER_NAME="$name" \
-WORKSPACE_DIR="$target_dir" \
-podman-compose \
-    --project-name $name \
-    up -d 
+sandbox_compose "$platform" up -d
 
 podman ps -a

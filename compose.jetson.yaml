@@ -1,0 +1,9 @@
+services:
+  dev:
+    build:
+      args:
+        BASE_IMAGE: nvcr.io/nvidia/pytorch:25.02-py3-igpu
+    image: dev-sandbox-jetson
+    devices:
+      - nvidia.com/gpu=all
+      - /dev/snd

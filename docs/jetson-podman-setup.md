@@ -1,4 +1,4 @@
-# JetsonホストのPodman更新
+# JetsonホストのPodman・CDIセットアップ
 
 Jetson Linux 36.5 / JetPack 6.2.2のUbuntu 22.04では、標準APTリポジトリからPodman 3.4.4がインストールされます。この版はNVIDIAが推奨するCDIデバイス指定（`--device nvidia.com/gpu=all`）に必要なPodman 4.1以降の要件を満たしません。
 
@@ -174,15 +174,24 @@ podman run --rm docker.io/library/ubuntu:22.04 true
 podman-compose --version
 ```
 
-CDIの構文がPodmanに認識されることは、登録済みデバイスを確認した後にテストできます。
+### 8. Jetson GPU用CDI deviceの登録
+
+NVIDIA Container Toolkitが検出したJetsonのGPUデバイスとドライバーライブラリをCDI specとして保存します。
 
 ```bash
+sudo install -d -m 0755 /etc/cdi
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
 nvidia-ctk cdi list
-podman create --name cdi-check --device nvidia.com/pva=all docker.io/library/ubuntu:22.04 true
+```
+
+一覧に`nvidia.com/gpu=all`が表示されることを確認し、PodmanがCDI deviceを解決できることをテストします。
+
+```bash
+podman create --name cdi-check --device nvidia.com/gpu=all docker.io/library/ubuntu:22.04 true
 podman rm cdi-check
 ```
 
-Jetson GPU用の`nvidia.com/gpu=all`は、GPUのCDI specを生成してから使用します。CDI設定はJetson向けコンテナ対応とあわせて追加します。
+JetPackまたはNVIDIAドライバーを更新した場合は、同じ`nvidia-ctk cdi generate`コマンドを再実行してspecを更新してください。
 
 ### ロールバック
 
@@ -203,5 +212,6 @@ Podman 5で作成・変更したコンテナmetadataはPodman 3.4から参照で
 - [Podman installation](https://podman.io/docs/installation)
 - [Podman releases](https://github.com/containers/podman/releases)
 - [NVIDIA Container Toolkit: CDI support](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html)
+- [NVIDIA PyTorch for Jetson release notes](https://docs.nvidia.com/deeplearning/frameworks/install-pytorch-jetson-platform-release-notes/pytorch-jetson-rel.html)
 - [Netavark](https://github.com/containers/netavark)
 - [Aardvark DNS](https://github.com/containers/aardvark-dns)
