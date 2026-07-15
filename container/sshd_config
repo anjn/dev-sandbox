@@ -1,0 +1,17 @@
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+AllowUsers ubuntu
+AuthorizedKeysFile /etc/dev-sandbox/authorized_keys
+HostKey /var/lib/dev-sandbox/ssh/ssh_host_ed25519_key
+PidFile /run/sshd/sshd.pid
+UsePAM yes
+PrintMotd no
+X11Forwarding no
+AllowTcpForwarding yes
+GatewayPorts no
+PermitTunnel no
+AcceptEnv LANG LC_*

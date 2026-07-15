@@ -4,7 +4,7 @@ services:
     build:
       context: .
       dockerfile: Containerfile
-    command: bash
+    command: sudo --preserve-env=SANDBOX_SSH_PORT /usr/local/sbin/dev-sandbox-sshd
     working_dir: /workspace
     userns_mode: keep-id
     ipc: host
@@ -15,10 +15,16 @@ services:
     volumes:
       - ${WORKSPACE_DIR}:/workspace
       - ${HOME}/.codex:/home/ubuntu/.codex
+      - ${SANDBOX_SSH_AUTHORIZED_KEYS_FILE}:/etc/dev-sandbox/authorized_keys:ro
+      - ssh-host-keys:/var/lib/dev-sandbox/ssh
     environment:
       - TZ=Asia/Tokyo
       - LANG=ja_JP.UTF-8
       - LC_CTYPE=ja_JP.UTF-8
+      - SANDBOX_SSH_PORT=${SANDBOX_SSH_PORT}
     network_mode: host
     stdin_open: true
     tty: true
+
+volumes:
+  ssh-host-keys:

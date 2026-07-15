@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+port=${SANDBOX_SSH_PORT:?SANDBOX_SSH_PORT is required}
+if [[ ! $port =~ ^[0-9]+$ ]] || ((port < 1024 || port > 65535)); then
+    echo "Invalid SANDBOX_SSH_PORT: $port" >&2
+    exit 1
+fi
+
+install -d -m 0755 /run/sshd /var/lib/dev-sandbox/ssh
+
+host_key=/var/lib/dev-sandbox/ssh/ssh_host_ed25519_key
+if [[ ! -s $host_key ]]; then
+    ssh-keygen -q -t ed25519 -N '' -f "$host_key"
+fi
+chown root:root "$host_key" "$host_key.pub"
+chmod 0600 "$host_key"
+chmod 0644 "$host_key.pub"
+
+/usr/sbin/sshd -t
+exec /usr/sbin/sshd -D -e -p "$port"

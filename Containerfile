@@ -62,3 +62,17 @@ RUN curl -fsSL https://bun.sh/install | bash
 RUN curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
 RUN curl -fsSL https://opencode.ai/install | bash
 RUN curl -fsSL https://claude.ai/install.sh | bash
+
+USER root
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server && \
+    rm -f /etc/ssh/ssh_host_* && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY container/sshd_config /etc/ssh/sshd_config.d/99-dev-sandbox.conf
+COPY container/start-sshd /usr/local/sbin/dev-sandbox-sshd
+RUN chmod 0755 /usr/local/sbin/dev-sandbox-sshd && \
+    passwd -d ubuntu
+
+USER ubuntu

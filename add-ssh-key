@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(dirname -- "$(readlink -f -- "$0")")/lib/sandbox.sh"
+
+if (($# > 1)); then
+    echo "Usage: $0 [PUBLIC_KEY_FILE]" >&2
+    exit 2
+fi
+
+sandbox_require_commands flock install mktemp ssh-keygen
+
+input_file=$(mktemp)
+check_file=$(mktemp)
+validated_file=$(mktemp)
+cleanup() {
+    rm -f -- "$input_file" "$check_file" "$validated_file"
+}
+trap cleanup EXIT
+
+if (($# == 1)); then
+    [[ -f $1 ]] || {
+        echo "Public key file not found: $1" >&2
+        exit 1
+    }
+    cp -- "$1" "$input_file"
+else
+    cat > "$input_file"
+fi
+
+found=0
+while IFS= read -r line || [[ -n $line ]]; do
+    [[ $line =~ ^[[:space:]]*$ || $line =~ ^[[:space:]]*# ]] && continue
+    found=1
+    read -r key_type key_data _ <<< "$line"
+    case "$key_type" in
+        ssh-*|ecdsa-*|sk-*)
+            ;;
+        *)
+            echo "Invalid SSH public key: $line" >&2
+            exit 1
+            ;;
+    esac
+
+    printf '%s\n' "$line" > "$check_file"
+    if ! ssh-keygen -l -f "$check_file" >/dev/null 2>&1; then
+        echo "Invalid SSH public key: $line" >&2
+        exit 1
+    fi
+    printf '%s\n' "$line" >> "$validated_file"
+done < "$input_file"
+
+((found == 1)) || {
+    echo "No SSH public key found in input." >&2
+    exit 1
+}
+
+install -d -m 0700 -- "$SANDBOX_CONFIG_DIR"
+touch "$SSH_AUTHORIZED_KEYS_FILE"
+chmod 0600 "$SSH_AUTHORIZED_KEYS_FILE"
+
+exec {lock_fd}>"$SANDBOX_CONFIG_DIR/authorized_keys.lock"
+flock "$lock_fd"
+
+added=0
+while IFS= read -r line; do
+    read -r key_type key_data _ <<< "$line"
+    if awk -v type="$key_type" -v data="$key_data" \
+        '$1 == type && $2 == data { found = 1 } END { exit(found ? 0 : 1) }' \
+        "$SSH_AUTHORIZED_KEYS_FILE"; then
+        continue
+    fi
+
+    printf '%s\n' "$line" >> "$SSH_AUTHORIZED_KEYS_FILE"
+    added=$((added + 1))
+done < "$validated_file"
+
+echo "Registered $added new SSH key(s) in $SSH_AUTHORIZED_KEYS_FILE"
