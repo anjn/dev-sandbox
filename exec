@@ -13,4 +13,3 @@ name="dev-sandbox-$target_name"
 cd $sandbox_dir
 
 podman exec -it $name "$@"
-
