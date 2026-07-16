@@ -12,6 +12,10 @@ SSH_PORT_STATE_FILE="$SANDBOX_STATE_DIR/$CONTAINER_NAME.ssh-port"
 SSH_PORT="${SANDBOX_SSH_PORT:-}"
 SSH_PORT_MIN=22000
 SSH_PORT_MAX=22999
+UP_HELP_REQUESTED=0
+EXTRA_MOUNT_SOURCES=()
+EXTRA_MOUNT_TARGETS=()
+EXTRA_MOUNT_MODES=()
 
 sandbox_require_commands() {
     local command_name
@@ -272,9 +276,189 @@ OpenSSH config for VS Code Remote SSH:
 EOF
 }
 
+sandbox_print_up_usage() {
+    cat <<EOF
+Usage: $SANDBOX_DIR/up [-v HOST[:CONTAINER[:ro|rw]]]...
+
+Add one or more directory bind mounts for this invocation of up.
+If CONTAINER is omitted, the canonical HOST path is used in the container.
+The default access mode is rw. Use HOST::ro for a read-only same-path mount.
+
+Examples:
+  $SANDBOX_DIR/up -v /data/models
+  $SANDBOX_DIR/up -v /data/models:/models:ro
+  $SANDBOX_DIR/up --volume=./cache:/cache:rw
+EOF
+}
+
+sandbox_path_contains() {
+    local parent=$1
+    local child=$2
+
+    [[ $child == "$parent" || $child == "$parent/"* ]]
+}
+
+sandbox_check_extra_mount_target() {
+    local target=$1
+    local existing_target
+    local managed_target
+    local protected_target
+
+    for existing_target in "${EXTRA_MOUNT_TARGETS[@]}"; do
+        if [[ $target == "$existing_target" ]]; then
+            echo "Duplicate extra mount target: $target" >&2
+            return 1
+        fi
+    done
+
+    for managed_target in /workspace /home/ubuntu/.codex; do
+        if sandbox_path_contains "$target" "$managed_target"; then
+            echo "Extra mount target would hide a managed mount: $target" >&2
+            return 1
+        fi
+    done
+
+    for protected_target in \
+        /etc/dev-sandbox/authorized_keys \
+        /var/lib/dev-sandbox/ssh \
+        /etc/ssh \
+        /run/sshd \
+        /usr/local/sbin/dev-sandbox-sshd; do
+        if sandbox_path_contains "$target" "$protected_target" ||
+            sandbox_path_contains "$protected_target" "$target"; then
+            echo "Extra mount target conflicts with the SSH runtime: $target" >&2
+            return 1
+        fi
+    done
+}
+
+sandbox_add_extra_mount() {
+    local spec=$1
+    local source
+    local target
+    local mode
+    local remainder
+
+    [[ -n $spec ]] || {
+        echo "Volume specification must not be empty." >&2
+        return 1
+    }
+
+    if [[ $spec == *:*:* ]]; then
+        source=${spec%%:*}
+        remainder=${spec#*:}
+        target=${remainder%%:*}
+        mode=${remainder#*:}
+        if [[ $mode == *:* ]]; then
+            echo "Paths containing ':' are not supported in volume specifications: $spec" >&2
+            return 1
+        fi
+    elif [[ $spec == *:* ]]; then
+        source=${spec%%:*}
+        target=${spec#*:}
+        mode=rw
+    else
+        source=$spec
+        target=""
+        mode=rw
+    fi
+
+    [[ -n $source ]] || {
+        echo "Volume source must not be empty: $spec" >&2
+        return 1
+    }
+    [[ -d $source ]] || {
+        echo "Volume source is not an existing directory: $source" >&2
+        return 1
+    }
+    source=$(readlink -f -- "$source")
+
+    case "$mode" in
+        ro|rw)
+            ;;
+        *)
+            echo "Invalid volume mode '$mode' in: $spec (expected ro or rw)" >&2
+            return 1
+            ;;
+    esac
+
+    if [[ -z $target ]]; then
+        target=$source
+    elif [[ $target != /* ]]; then
+        echo "Volume target must be an absolute path: $target" >&2
+        return 1
+    else
+        target=$(readlink -m -- "$target")
+    fi
+
+    sandbox_check_extra_mount_target "$target" || return
+
+    EXTRA_MOUNT_SOURCES+=("$source")
+    EXTRA_MOUNT_TARGETS+=("$target")
+    EXTRA_MOUNT_MODES+=("$mode")
+}
+
+sandbox_parse_up_args() {
+    local argument
+
+    UP_HELP_REQUESTED=0
+    EXTRA_MOUNT_SOURCES=()
+    EXTRA_MOUNT_TARGETS=()
+    EXTRA_MOUNT_MODES=()
+
+    while (($#)); do
+        argument=$1
+        case "$argument" in
+            -v|--volume)
+                shift
+                (($#)) || {
+                    echo "Missing volume specification after $argument." >&2
+                    sandbox_print_up_usage >&2
+                    return 1
+                }
+                sandbox_add_extra_mount "$1" || return
+                ;;
+            --volume=*)
+                sandbox_add_extra_mount "${argument#*=}" || return
+                ;;
+            -h|--help)
+                UP_HELP_REQUESTED=1
+                sandbox_print_up_usage
+                return
+                ;;
+            *)
+                echo "Unknown up argument: $argument" >&2
+                sandbox_print_up_usage >&2
+                return 1
+                ;;
+        esac
+        shift
+    done
+}
+
+sandbox_render_extra_mounts() {
+    local index
+    local -a arguments=()
+
+    for ((index = 0; index < ${#EXTRA_MOUNT_SOURCES[@]}; index++)); do
+        arguments+=(
+            "${EXTRA_MOUNT_SOURCES[index]}"
+            "${EXTRA_MOUNT_TARGETS[index]}"
+            "${EXTRA_MOUNT_MODES[index]}"
+        )
+    done
+
+    python3 "$SANDBOX_DIR/lib/render-mounts.py" "${arguments[@]}"
+}
+
 sandbox_compose() {
     local platform=$1
+    local -a extra_files=()
     shift
+
+    if [[ ${SANDBOX_COMPOSE_STDIN_OVERRIDE:-0} == 1 ]]; then
+        extra_files=(--file -)
+    fi
 
     (
         cd -- "$SANDBOX_DIR"
@@ -285,6 +469,7 @@ sandbox_compose() {
         podman-compose \
             --file compose.yaml \
             --file "compose.$platform.yaml" \
+            "${extra_files[@]}" \
             --project-name "$CONTAINER_NAME" \
             "$@"
     )

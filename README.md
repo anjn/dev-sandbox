@@ -13,6 +13,31 @@ cd /path/to/workspace
 /path/to/dev-sandbox/down
 ```
 
+### 追加ディレクトリのmount
+
+`up`の`-v`または`--volume`を繰り返し指定すると、workspace以外のホストディレクトリもbind mountできます。コンテナ側パスを省略した場合は、ホストの絶対パスと同じ場所へread-writeでmountします。
+
+```bash
+# ホストと同じ絶対パスへmount
+/path/to/dev-sandbox/up -v /data/models
+
+# コンテナ側の別パスへread-onlyでmount
+/path/to/dev-sandbox/up -v /data/models:/models:ro
+
+# 複数指定
+/path/to/dev-sandbox/up \
+  -v /data/models:/models:ro \
+  --volume="$HOME/cache:/cache:rw"
+```
+
+同一パスへread-onlyでmountする場合は、中央のパスを空にします。
+
+```bash
+/path/to/dev-sandbox/up -v /data/models::ro
+```
+
+追加mountはその`up`呼び出しだけに適用され、次回へ保存されません。次回も必要な場合は同じ`-v`を指定してください。指定なしで`up`し直すと追加mountは外れます。sourceは既存ディレクトリに限定し、コンテナ側の相対パス、パス中の`:`、同じtargetの重複、およびworkspaceやSSH設定を隠すmountは拒否されます。
+
 自動判定を上書きする場合は`SANDBOX_PLATFORM`へ`rocm`または`jetson`を指定します。
 
 ```bash

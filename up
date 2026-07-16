@@ -4,16 +4,29 @@ set -euo pipefail
 
 source "$(dirname -- "$(readlink -f -- "$0")")/lib/sandbox.sh"
 
+sandbox_parse_up_args "$@"
+if ((UP_HELP_REQUESTED)); then
+    exit 0
+fi
+
 platform=$(sandbox_resolve_platform)
 
 sandbox_require_commands flock install podman podman-compose ssh-keygen ss stat
+if ((${#EXTRA_MOUNT_SOURCES[@]})); then
+    sandbox_require_commands python3
+fi
 if [[ $platform == jetson ]]; then
     sandbox_check_jetson_cdi
 fi
 sandbox_check_ssh_authorized_keys
 sandbox_prepare_ssh_port
 
-sandbox_compose "$platform" up -d
+if ((${#EXTRA_MOUNT_SOURCES[@]})); then
+    sandbox_render_extra_mounts |
+        SANDBOX_COMPOSE_STDIN_OVERRIDE=1 sandbox_compose "$platform" up -d
+else
+    sandbox_compose "$platform" up -d
+fi
 
 podman ps -a
 sandbox_print_ssh_info
