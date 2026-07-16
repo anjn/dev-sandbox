@@ -13,7 +13,7 @@ platform=$(sandbox_resolve_platform)
 
 sandbox_require_commands flock install podman podman-compose ssh-keygen ss stat
 if ((${#EXTRA_MOUNT_SOURCES[@]})); then
-    sandbox_require_commands python3
+    sandbox_require_commands mktemp python3
 fi
 if [[ $platform == jetson ]]; then
     sandbox_check_jetson_cdi
@@ -22,8 +22,15 @@ sandbox_check_ssh_authorized_keys
 sandbox_prepare_ssh_port
 
 if ((${#EXTRA_MOUNT_SOURCES[@]})); then
-    sandbox_render_extra_mounts |
-        SANDBOX_COMPOSE_STDIN_OVERRIDE=1 sandbox_compose "$platform" up -d
+    extra_mount_override=$(mktemp -- "${TMPDIR:-/tmp}/dev-sandbox-mounts.XXXXXX.yaml")
+    cleanup_extra_mount_override() {
+        rm -f -- "$extra_mount_override"
+    }
+    trap cleanup_extra_mount_override EXIT
+
+    sandbox_render_extra_mounts > "$extra_mount_override"
+    SANDBOX_COMPOSE_OVERRIDE_FILE="$extra_mount_override" \
+        sandbox_compose "$platform" up -d
 else
     sandbox_compose "$platform" up -d
 fi

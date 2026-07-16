@@ -456,8 +456,8 @@ sandbox_compose() {
     local -a extra_files=()
     shift
 
-    if [[ ${SANDBOX_COMPOSE_STDIN_OVERRIDE:-0} == 1 ]]; then
-        extra_files=(--file -)
+    if [[ -n ${SANDBOX_COMPOSE_OVERRIDE_FILE:-} ]]; then
+        extra_files=(--file "$SANDBOX_COMPOSE_OVERRIDE_FILE")
     fi
 
     (
