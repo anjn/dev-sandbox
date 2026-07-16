@@ -99,3 +99,4 @@ SSH serverはホストのネットワーク上で待ち受けます。インタ�
 ## ドキュメント
 
 - [JetsonホストのPodman・CDIセットアップ](docs/jetson-podman-setup.md)
+- [Jetson rootless PodmanのGPU device権限](docs/jetson-rootless-gpu-access.md)

@@ -193,6 +193,17 @@ podman rm cdi-check
 
 JetPackまたはNVIDIAドライバーを更新した場合は、同じ`nvidia-ctk cdi generate`コマンドを再実行してspecを更新してください。
 
+### 9. rootlessコンテナのGPU device ACL
+
+SSHログイン後のコンテナユーザーからGPUを使用するため、rootless Podmanを実行するホストユーザーにdevice ACLを設定します。
+
+```bash
+cd /path/to/dev-sandbox
+sudo ./setup-jetson-gpu-access
+```
+
+詳しい原因、対象device、検証結果、ロールバック方法は[Jetson rootless PodmanのGPU device権限](jetson-rootless-gpu-access.md)を参照してください。
+
 ### ロールバック
 
 新しいPodmanを無効化し、UbuntuのAPT版へ戻す場合は次を実行します。
