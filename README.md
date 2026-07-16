@@ -46,6 +46,16 @@ SANDBOX_PLATFORM=jetson /path/to/dev-sandbox/up
 
 JetsonではJetPack 6.2対応のNVIDIA PyTorch 25.02 iGPUイメージを使用します。初回起動前に、下記ドキュメントに従ってPodmanとGPU用CDI deviceを準備してください。
 
+JetsonイメージのUbuntu ports mirrorは、デフォルトで山形大学のmirrorを使用します。別のmirrorでbuildする場合は`UBUNTU_PORTS_MIRROR` build argumentを指定します。ROCmイメージの`archive.ubuntu.com`は置換されません。
+
+```bash
+podman build \
+  --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:25.02-py3-igpu \
+  --build-arg UBUNTU_PORTS_MIRROR=https://ports.ubuntu.com/ubuntu-ports \
+  --tag dev-sandbox-jetson \
+  /path/to/dev-sandbox
+```
+
 ## SSH接続
 
 コンテナは公開鍵認証のSSH serverを起動します。秘密鍵は接続元だけに保持し、接続を許可する公開鍵をホストの`~/.config/dev-sandbox/authorized_keys`へ登録します。このファイルはすべてのworkspaceで共通です。

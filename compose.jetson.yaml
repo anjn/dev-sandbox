@@ -3,6 +3,7 @@ services:
     build:
       args:
         BASE_IMAGE: nvcr.io/nvidia/pytorch:25.02-py3-igpu
+        UBUNTU_PORTS_MIRROR: ${UBUNTU_PORTS_MIRROR:-https://linux.yz.yamagata-u.ac.jp/pub/linux/ubuntu-ports}
     image: dev-sandbox-jetson
     devices:
       - nvidia.com/gpu=all

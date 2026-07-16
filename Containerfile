@@ -1,7 +1,14 @@
 ARG BASE_IMAGE=docker.io/rocm/pytorch:rocm7.2.2_ubuntu24.04_py3.12_pytorch_release_2.10.0
 FROM ${BASE_IMAGE}
 
+ARG UBUNTU_PORTS_MIRROR=https://linux.yz.yamagata-u.ac.jp/pub/linux/ubuntu-ports
+
 USER root
+
+RUN test -n "$UBUNTU_PORTS_MIRROR" && \
+    find /etc/apt -maxdepth 2 -type f \
+        \( -name sources.list -o -name '*.list' -o -name '*.sources' \) -exec \
+        sed -i "s|http://ports.ubuntu.com/ubuntu-ports/|${UBUNTU_PORTS_MIRROR%/}/|g" {} +
 
 RUN getent group ubuntu >/dev/null || groupadd --gid 1000 ubuntu; \
     id --user ubuntu >/dev/null 2>&1 || \
