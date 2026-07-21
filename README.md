@@ -56,6 +56,26 @@ podman build \
   /path/to/dev-sandbox
 ```
 
+### GPU device ACL
+
+SSHログイン後のコンテナユーザーからGPUを使用するため、rootless Podmanを実行するホストユーザーにdevice ACLを設定します。
+
+ROCmホスト:
+
+```bash
+cd /path/to/dev-sandbox
+sudo ./setup-rocm-gpu-access
+```
+
+Jetsonホスト:
+
+```bash
+cd /path/to/dev-sandbox
+sudo ./setup-jetson-gpu-access
+```
+
+詳しい原因、対象device、ロールバック方法は[ROCm rootless PodmanのGPU device権限](docs/rocm-rootless-gpu-access.md)または[Jetson rootless PodmanのGPU device権限](docs/jetson-rootless-gpu-access.md)を参照してください。
+
 ## SSH接続
 
 コンテナは公開鍵認証のSSH serverを起動します。秘密鍵は接続元だけに保持し、接続を許可する公開鍵をホストの`~/.config/dev-sandbox/authorized_keys`へ登録します。このファイルはすべてのworkspaceで共通です。
@@ -96,7 +116,19 @@ SANDBOX_SSH_PORT=2222 /path/to/dev-sandbox/up
 
 SSH serverはホストのネットワーク上で待ち受けます。インターネットに直接公開せず、LAN/VPNとホスト側firewallで接続元を制限してください。パスワード認証とrootログインは無効です。
 
+## ホスト再起動後の自動起動
+
+`up`で作成したコンテナにはPodmanの`restart: always` policyが設定されます。rootlessコンテナをホスト起動時にも復帰させるには、Podmanユーザーのsystemd user serviceを有効化します。
+
+```bash
+sudo loginctl enable-linger "$USER"
+systemctl --user enable podman-restart.service
+```
+
+既存コンテナへrestart policyを反映するには、更新後にもう一度`up`を実行してください。
+
 ## ドキュメント
 
 - [JetsonホストのPodman・CDIセットアップ](docs/jetson-podman-setup.md)
+- [ROCm rootless PodmanのGPU device権限](docs/rocm-rootless-gpu-access.md)
 - [Jetson rootless PodmanのGPU device権限](docs/jetson-rootless-gpu-access.md)

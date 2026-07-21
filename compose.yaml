@@ -1,6 +1,7 @@
 services:
   dev:
     container_name: ${CONTAINER_NAME}
+    restart: always
     build:
       context: .
       dockerfile: Containerfile
