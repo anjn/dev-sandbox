@@ -4,11 +4,13 @@ set -euo pipefail
 
 source "$(dirname -- "$(readlink -f -- "$0")")/lib/sandbox.sh"
 
+role=$(sandbox_resolve_role)
 platform=$(sandbox_resolve_platform)
+sandbox_check_role_platform "$role" "$platform"
 
 sandbox_require_commands podman podman-compose
 sandbox_load_ssh_port || SSH_PORT=2222
 
-sandbox_compose "$platform" down
+sandbox_compose "$platform" "$role" down
 
 podman ps -a

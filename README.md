@@ -44,6 +44,59 @@ cd /path/to/workspace
 SANDBOX_PLATFORM=jetson /path/to/dev-sandbox/up
 ```
 
+### ROS 2 tools role
+
+`SANDBOX_ROLE=ros2-tools`を指定すると、Strix HaloなどのAMD/ROCmホスト上でROS 2 CLI、RViz、DDS確認ツール用のコンテナを起動します。ホストにはROS 2をapt installしません。AWSIM binaryはホスト上で起動したまま、toolsコンテナからtopicやRVizを確認します。
+
+このroleは`SANDBOX_PLATFORM=rocm`専用です。通常のAI開発用sandboxは従来どおり`SANDBOX_ROLE`未指定、つまり`base`で起動します。
+
+まずUbuntu on Xorgでログインしていることを確認します。
+
+```bash
+echo "$XDG_SESSION_TYPE"
+```
+
+同一ホストで起動するAWSIMだけを見る場合は`lo`を指定してCycloneDDS設定を作成します。
+
+```bash
+/path/to/dev-sandbox/scripts/make-cyclonedds-config \
+  --interface lo \
+  --output ~/autoware_data/config/cyclonedds.xml
+```
+
+Jetson Autoware containerと接続確認するmulti-host構成では、`lo`の代わりに有線LAN NIC名を指定します。
+
+```bash
+/path/to/dev-sandbox/scripts/make-cyclonedds-config \
+  --interface enp5s0 \
+  --output ~/autoware_data/config/cyclonedds.xml
+```
+
+AWSIM binaryをホストで起動してから、workspaceへ移動してtoolsコンテナを起動します。`ROS_DOMAIN_ID`はAWSIMやJetson側と同じ値にしてください。
+
+```bash
+cd /path/to/workspace
+ROS_DOMAIN_ID=0 \
+SANDBOX_ROLE=ros2-tools \
+SANDBOX_PLATFORM=rocm \
+/path/to/dev-sandbox/up
+```
+
+コンテナ内でpreflight、topic確認、RViz起動を行います。multi-host構成では`--interface`へ有線LAN NIC名を指定します。
+
+```bash
+/path/to/dev-sandbox/exec preflight-ros2-tools --interface lo
+/path/to/dev-sandbox/exec check-awsim-topics
+/path/to/dev-sandbox/exec run-rviz
+```
+
+直接確認する場合は、コンテナ内で`ros2 topic list`や`rviz2`も実行できます。
+
+```bash
+/path/to/dev-sandbox/exec bash -lc 'source /opt/ros/humble/setup.bash && ros2 topic list'
+/path/to/dev-sandbox/exec bash -lc 'source /opt/ros/humble/setup.bash && rviz2'
+```
+
 JetsonではJetPack 6.2対応のNVIDIA PyTorch 25.02 iGPUイメージを使用します。初回起動前に、下記ドキュメントに従ってPodmanとGPU用CDI deviceを準備してください。
 
 JetsonイメージのUbuntu ports mirrorは、デフォルトで山形大学のmirrorを使用します。別のmirrorでbuildする場合は`UBUNTU_PORTS_MIRROR` build argumentを指定します。ROCmイメージの`archive.ubuntu.com`は置換されません。

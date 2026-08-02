@@ -9,16 +9,19 @@ if ((UP_HELP_REQUESTED)); then
     exit 0
 fi
 
+role=$(sandbox_resolve_role)
 platform=$(sandbox_resolve_platform)
+sandbox_check_role_platform "$role" "$platform"
 
 sandbox_require_commands flock install podman podman-compose ssh-keygen ss stat
 if ((${#EXTRA_MOUNT_SOURCES[@]})); then
     sandbox_require_commands mktemp python3
 fi
-if [[ $platform == jetson ]]; then
+if [[ $role == base && $platform == jetson ]]; then
     sandbox_check_jetson_cdi
 fi
 sandbox_check_ssh_authorized_keys
+sandbox_prepare_role_environment "$role"
 sandbox_prepare_ssh_port
 
 if ((${#EXTRA_MOUNT_SOURCES[@]})); then
@@ -30,9 +33,9 @@ if ((${#EXTRA_MOUNT_SOURCES[@]})); then
 
     sandbox_render_extra_mounts > "$extra_mount_override"
     SANDBOX_COMPOSE_OVERRIDE_FILE="$extra_mount_override" \
-        sandbox_compose "$platform" up -d
+        sandbox_compose "$platform" "$role" up -d
 else
-    sandbox_compose "$platform" up -d
+    sandbox_compose "$platform" "$role" up -d
 fi
 
 podman ps -a

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+fail() {
+    echo "$1" >&2
+    exit 1
+}
+
+usage() {
+    cat <<EOF
+Usage: $0 [RVIZ2_ARGS...]
+
+Runs rviz2 after checking X11 and DRI access.
+EOF
+}
+
+case "${1:-}" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+esac
+
+[[ -n ${DISPLAY:-} ]] || fail "DISPLAY is not set."
+[[ -z ${XAUTHORITY:-} || -f $XAUTHORITY ]] || fail "XAUTHORITY file not found: $XAUTHORITY"
+[[ -d /tmp/.X11-unix ]] || fail "X11 socket directory not found: /tmp/.X11-unix"
+[[ -e /dev/dri ]] || fail "DRI device directory not found: /dev/dri"
+
+if [[ $DISPLAY == :* ]]; then
+    display_number=${DISPLAY#:}
+    display_number=${display_number%%.*}
+    [[ -S /tmp/.X11-unix/X$display_number ]] || \
+        fail "X11 socket not found: /tmp/.X11-unix/X$display_number"
+fi
+
+glx_output=$(glxinfo -B 2>&1) || {
+    echo "$glx_output" >&2
+    fail "glxinfo -B failed."
+}
+
+echo "$glx_output"
+if grep -Eiq 'llvmpipe|software rasterizer' <<< "$glx_output"; then
+    fail "glxinfo is using llvmpipe/software rendering."
+fi
+
+source /opt/ros/humble/setup.bash
+exec rviz2 "$@"

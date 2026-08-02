@@ -13,6 +13,8 @@ SSH_PORT="${SANDBOX_SSH_PORT:-}"
 SSH_PORT_MIN=22000
 SSH_PORT_MAX=22999
 UP_HELP_REQUESTED=0
+SANDBOX_XAUTHORITY_FILE=""
+SANDBOX_AUTOWARE_DATA_DIR=""
 EXTRA_MOUNT_SOURCES=()
 EXTRA_MOUNT_TARGETS=()
 EXTRA_MOUNT_MODES=()
@@ -50,6 +52,85 @@ sandbox_resolve_platform() {
         echo "Unable to detect the accelerator platform. Set SANDBOX_PLATFORM=rocm or jetson." >&2
         return 1
     fi
+}
+
+sandbox_resolve_role() {
+    case "${SANDBOX_ROLE:-base}" in
+        base|ros2-tools)
+            printf '%s\n' "${SANDBOX_ROLE:-base}"
+            ;;
+        *)
+            echo "Invalid SANDBOX_ROLE: $SANDBOX_ROLE (expected base or ros2-tools)" >&2
+            return 1
+            ;;
+    esac
+}
+
+sandbox_check_role_platform() {
+    local role=$1
+    local platform=$2
+
+    if [[ $role == ros2-tools && $platform != rocm ]]; then
+        echo "SANDBOX_ROLE=ros2-tools is only supported with SANDBOX_PLATFORM=rocm." >&2
+        return 1
+    fi
+}
+
+sandbox_resolve_xauthority_file() {
+    local candidate
+    local -a candidates=()
+
+    if [[ -n ${XAUTHORITY:-} ]]; then
+        candidates+=("$XAUTHORITY")
+    fi
+    candidates+=("$HOME/.Xauthority")
+
+    for candidate in "${candidates[@]}"; do
+        if [[ -f $candidate ]]; then
+            readlink -f -- "$candidate"
+            return
+        fi
+    done
+
+    if [[ -n ${XAUTHORITY:-} ]]; then
+        echo "XAUTHORITY does not point to an existing file: $XAUTHORITY" >&2
+    else
+        echo "No Xauthority file found. Set XAUTHORITY or create $HOME/.Xauthority." >&2
+    fi
+    return 1
+}
+
+sandbox_prepare_role_environment() {
+    local role=$1
+
+    case "$role" in
+        base)
+            return
+            ;;
+        ros2-tools)
+            [[ -n ${DISPLAY:-} ]] || {
+                echo "DISPLAY is required for SANDBOX_ROLE=ros2-tools." >&2
+                return 1
+            }
+            [[ -d /tmp/.X11-unix ]] || {
+                echo "X11 socket directory not found: /tmp/.X11-unix" >&2
+                return 1
+            }
+
+            SANDBOX_XAUTHORITY_FILE=$(sandbox_resolve_xauthority_file) || return
+            SANDBOX_AUTOWARE_DATA_DIR=$(readlink -m -- "$HOME/autoware_data")
+            [[ -d $SANDBOX_AUTOWARE_DATA_DIR ]] || {
+                cat >&2 <<EOF
+Autoware data directory not found: $SANDBOX_AUTOWARE_DATA_DIR
+Create the CycloneDDS config before starting ros2-tools:
+
+  mkdir -p "$HOME/autoware_data/config"
+  $SANDBOX_DIR/scripts/make-cyclonedds-config --interface lo --output "$HOME/autoware_data/config/cyclonedds.xml"
+EOF
+                return 1
+            }
+            ;;
+    esac
 }
 
 sandbox_check_jetson_cdi() {
@@ -284,6 +365,10 @@ Add one or more directory bind mounts for this invocation of up.
 If CONTAINER is omitted, the canonical HOST path is used in the container.
 The default access mode is rw. Use HOST::ro for a read-only same-path mount.
 
+Environment:
+  SANDBOX_PLATFORM=rocm|jetson
+  SANDBOX_ROLE=base|ros2-tools
+
 Examples:
   $SANDBOX_DIR/up -v /data/models
   $SANDBOX_DIR/up -v /data/models:/models:ro
@@ -453,8 +538,23 @@ sandbox_render_extra_mounts() {
 
 sandbox_compose() {
     local platform=$1
+    local role=$2
     local -a extra_files=()
-    shift
+    local -a compose_files=(--file compose.yaml)
+    shift 2
+
+    case "$role" in
+        base)
+            compose_files+=(--file "compose.$platform.yaml")
+            ;;
+        ros2-tools)
+            compose_files+=(--file compose.ros2-tools-amd.yaml)
+            ;;
+        *)
+            echo "Invalid SANDBOX_ROLE: $role (expected base or ros2-tools)" >&2
+            return 1
+            ;;
+    esac
 
     if [[ -n ${SANDBOX_COMPOSE_OVERRIDE_FILE:-} ]]; then
         extra_files=(--file "$SANDBOX_COMPOSE_OVERRIDE_FILE")
@@ -466,9 +566,13 @@ sandbox_compose() {
         WORKSPACE_DIR="$WORKSPACE_DIR" \
         SANDBOX_SSH_PORT="${SSH_PORT:-2222}" \
         SANDBOX_SSH_AUTHORIZED_KEYS_FILE="$SSH_AUTHORIZED_KEYS_FILE" \
+        SANDBOX_XAUTHORITY_FILE="${SANDBOX_XAUTHORITY_FILE:-/dev/null}" \
+        SANDBOX_AUTOWARE_DATA_DIR="${SANDBOX_AUTOWARE_DATA_DIR:-$HOME/autoware_data}" \
+        DISPLAY="${DISPLAY:-}" \
+        XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-}" \
+        ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-}" \
         podman-compose \
-            --file compose.yaml \
-            --file "compose.$platform.yaml" \
+            "${compose_files[@]}" \
             "${extra_files[@]}" \
             --project-name "$CONTAINER_NAME" \
             "$@"

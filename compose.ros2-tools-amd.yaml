@@ -1,0 +1,27 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Containerfile.ros2-tools-humble
+    image: dev-sandbox-ros2-tools-amd
+    command: sudo --preserve-env=SANDBOX_SSH_PORT,DISPLAY,XAUTHORITY,XDG_SESSION_TYPE,ROS_DOMAIN_ID,RMW_IMPLEMENTATION,CYCLONEDDS_URI,ROS_LOCALHOST_ONLY /usr/local/sbin/dev-sandbox-sshd
+    network_mode: host
+    userns_mode: keep-id
+    ipc: host
+    group_add:
+      - keep-groups
+    devices:
+      - /dev/dri:/dev/dri
+      - /dev/snd:/dev/snd
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${SANDBOX_XAUTHORITY_FILE:-/dev/null}:/tmp/dev-sandbox.Xauthority:ro
+      - ${SANDBOX_AUTOWARE_DATA_DIR:-/tmp/dev-sandbox-autoware_data}:/autoware_data
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XAUTHORITY=/tmp/dev-sandbox.Xauthority
+      - XDG_SESSION_TYPE=${XDG_SESSION_TYPE}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=/autoware_data/config/cyclonedds.xml
+      - ROS_LOCALHOST_ONLY=0

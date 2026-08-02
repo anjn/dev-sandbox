@@ -1,0 +1,59 @@
+FROM docker.io/osrf/ros:humble-desktop
+
+USER root
+
+ENV TZ=Asia/Tokyo \
+    LANG=ja_JP.UTF-8 \
+    LC_CTYPE=ja_JP.UTF-8
+
+RUN getent group ubuntu >/dev/null || groupadd --gid 1000 ubuntu; \
+    id --user ubuntu >/dev/null 2>&1 || \
+        useradd --uid 1000 --gid ubuntu --create-home --shell /bin/bash ubuntu
+
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt-get update && \
+    rqt_packages=$(apt-cache pkgnames ros-humble-rqt | sort) && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    ca-certificates \
+    iproute2 \
+    jq \
+    less \
+    libgl1-mesa-dri \
+    locales \
+    mesa-utils \
+    mesa-vulkan-drivers \
+    net-tools \
+    openssh-server \
+    ros-humble-compressed-image-transport \
+    ros-humble-image-transport \
+    ros-humble-rmw-cyclonedds-cpp \
+    ros-humble-ros2bag \
+    ros-humble-rosbag2 \
+    ros-humble-rviz2 \
+    ros-humble-tf2-tools \
+    sudo \
+    tcpdump \
+    vim \
+    vulkan-tools \
+    $rqt_packages && \
+    locale-gen ja_JP.UTF-8 && update-locale LANG=ja_JP.UTF-8 && \
+    usermod -aG sudo ubuntu && \
+    echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu && \
+    chmod 0440 /etc/sudoers.d/ubuntu && \
+    rm -f /etc/ssh/ssh_host_* && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY container/sshd_config /etc/ssh/sshd_config.d/99-dev-sandbox.conf
+COPY container/start-sshd /usr/local/sbin/dev-sandbox-sshd
+COPY scripts/preflight-ros2-tools scripts/check-awsim-topics scripts/run-rviz /usr/local/bin/
+
+RUN chmod 0755 /usr/local/sbin/dev-sandbox-sshd \
+    /usr/local/bin/preflight-ros2-tools \
+    /usr/local/bin/check-awsim-topics \
+    /usr/local/bin/run-rviz && \
+    passwd -d ubuntu && \
+    printf '\nsource /opt/ros/humble/setup.bash\n' >> /home/ubuntu/.bashrc && \
+    chown ubuntu:ubuntu /home/ubuntu/.bashrc
+
+USER ubuntu

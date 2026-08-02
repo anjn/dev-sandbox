@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+    cat <<EOF
+Usage: $0 --interface NIC --output PATH
+
+Examples:
+  $0 --interface lo --output ~/autoware_data/config/cyclonedds.xml
+  $0 --interface enp5s0 --output ~/autoware_data/config/cyclonedds.xml
+EOF
+}
+
+interface=""
+output=""
+
+while (($#)); do
+    case "$1" in
+        --interface)
+            shift
+            (($#)) || {
+                echo "Missing value after --interface." >&2
+                usage >&2
+                exit 2
+            }
+            interface=$1
+            ;;
+        --interface=*)
+            interface=${1#*=}
+            ;;
+        --output)
+            shift
+            (($#)) || {
+                echo "Missing value after --output." >&2
+                usage >&2
+                exit 2
+            }
+            output=$1
+            ;;
+        --output=*)
+            output=${1#*=}
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+
+[[ -n $interface ]] || {
+    echo "--interface is required." >&2
+    usage >&2
+    exit 2
+}
+[[ -n $output ]] || {
+    echo "--output is required." >&2
+    usage >&2
+    exit 2
+}
+
+if [[ ! $interface =~ ^[A-Za-z0-9_.:-]+$ ]]; then
+    echo "Invalid interface name: $interface" >&2
+    exit 2
+fi
+
+if command -v ip >/dev/null 2>&1 && ! ip link show dev "$interface" >/dev/null 2>&1; then
+    echo "Network interface not found: $interface" >&2
+    exit 1
+fi
+
+case "$output" in
+    "~/"*)
+        output=$HOME/${output#"~/"}
+        ;;
+esac
+
+install -d -m 0755 -- "$(dirname -- "$output")"
+
+cat > "$output" <<EOF
+<?xml version="1.0" encoding="UTF-8" ?>
+<CycloneDDS>
+  <Domain>
+    <General>
+      <Interfaces>
+        <NetworkInterface name="$interface" multicast="true" />
+      </Interfaces>
+      <AllowMulticast>true</AllowMulticast>
+      <EnableMulticastLoopback>true</EnableMulticastLoopback>
+    </General>
+  </Domain>
+</CycloneDDS>
+EOF
+
+echo "Generated CycloneDDS config: $output"
+echo
+sed -n '1,200p' "$output"
