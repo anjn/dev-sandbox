@@ -8,8 +8,6 @@ services:
     network_mode: host
     userns_mode: keep-id
     ipc: host
-    group_add:
-      - keep-groups
     devices:
       - /dev/dri:/dev/dri
       - /dev/snd:/dev/snd
