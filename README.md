@@ -44,6 +44,22 @@ cd /path/to/workspace
 SANDBOX_PLATFORM=jetson /path/to/dev-sandbox/up
 ```
 
+### ディスプレイ出力
+
+通常の`rocm`/`jetson` sandboxでも、ホスト側に`DISPLAY`が設定されていて`/tmp/.X11-unix`が存在する場合は、X11 socketとXauthorityを自動でコンテナへ渡します。SSH接続ではなく、まず`exec`から表示確認するのが簡単です。
+
+```bash
+cd /path/to/workspace
+SANDBOX_PLATFORM=rocm /path/to/dev-sandbox/up
+/path/to/dev-sandbox/exec xeyes
+```
+
+GLの確認には`glxinfo`を使えます。
+
+```bash
+/path/to/dev-sandbox/exec glxinfo -B
+```
+
 ### ROS 2 tools role
 
 `SANDBOX_ROLE=ros2-tools`を指定すると、Strix HaloなどのAMD/ROCmホスト上でROS 2 CLI、RViz、DDS確認ツール用のコンテナを起動します。ホストにはROS 2をapt installしません。AWSIM binaryはホスト上で起動したまま、toolsコンテナからtopicやRVizを確認します。

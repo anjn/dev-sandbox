@@ -13,6 +13,7 @@ SSH_PORT="${SANDBOX_SSH_PORT:-}"
 SSH_PORT_MIN=22000
 SSH_PORT_MAX=22999
 UP_HELP_REQUESTED=0
+SANDBOX_DISPLAY_ENABLED=0
 SANDBOX_XAUTHORITY_FILE=""
 SANDBOX_AUTOWARE_DATA_DIR=""
 EXTRA_MOUNT_SOURCES=()
@@ -100,24 +101,50 @@ sandbox_resolve_xauthority_file() {
     return 1
 }
 
+sandbox_prepare_display_environment() {
+    local required=$1
+
+    SANDBOX_DISPLAY_ENABLED=0
+    SANDBOX_XAUTHORITY_FILE=/dev/null
+
+    if [[ -z ${DISPLAY:-} ]]; then
+        if [[ $required == required ]]; then
+            echo "DISPLAY is required for SANDBOX_ROLE=ros2-tools." >&2
+            return 1
+        fi
+        return
+    fi
+
+    if [[ ! -d /tmp/.X11-unix ]]; then
+        if [[ $required == required ]]; then
+            echo "X11 socket directory not found: /tmp/.X11-unix" >&2
+            return 1
+        fi
+        return
+    fi
+
+    if SANDBOX_XAUTHORITY_FILE=$(sandbox_resolve_xauthority_file 2>/dev/null); then
+        :
+    elif [[ $required == required ]]; then
+        sandbox_resolve_xauthority_file >/dev/null
+        return 1
+    else
+        SANDBOX_XAUTHORITY_FILE=/dev/null
+    fi
+
+    SANDBOX_DISPLAY_ENABLED=1
+}
+
 sandbox_prepare_role_environment() {
     local role=$1
 
     case "$role" in
         base)
+            sandbox_prepare_display_environment optional
             return
             ;;
         ros2-tools)
-            [[ -n ${DISPLAY:-} ]] || {
-                echo "DISPLAY is required for SANDBOX_ROLE=ros2-tools." >&2
-                return 1
-            }
-            [[ -d /tmp/.X11-unix ]] || {
-                echo "X11 socket directory not found: /tmp/.X11-unix" >&2
-                return 1
-            }
-
-            SANDBOX_XAUTHORITY_FILE=$(sandbox_resolve_xauthority_file) || return
+            sandbox_prepare_display_environment required || return
             SANDBOX_AUTOWARE_DATA_DIR=$(readlink -m -- "$HOME/autoware_data")
             [[ -d $SANDBOX_AUTOWARE_DATA_DIR ]] || {
                 cat >&2 <<EOF
@@ -546,6 +573,9 @@ sandbox_compose() {
     case "$role" in
         base)
             compose_files+=(--file "compose.$platform.yaml")
+            if ((SANDBOX_DISPLAY_ENABLED)); then
+                compose_files+=(--file compose.display.yaml)
+            fi
             ;;
         ros2-tools)
             compose_files+=(--file compose.ros2-tools-amd.yaml)

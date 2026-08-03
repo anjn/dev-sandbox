@@ -40,6 +40,7 @@ RUN apt-get update && \
     jq \
     libasound2-dev \
     locales \
+    mesa-utils \
     nodejs \
     npm \
     pkg-config \
@@ -49,6 +50,8 @@ RUN apt-get update && \
     tree \
     unzip \
     vulkan-tools libvulkan1 mesa-vulkan-drivers \
+    x11-apps \
+    xauth \
     libdw1t64 python3-yaml \
     && rm -rf /var/lib/apt/lists/*
 

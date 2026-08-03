@@ -1,0 +1,11 @@
+services:
+  dev:
+    command: sudo --preserve-env=SANDBOX_SSH_PORT,DISPLAY,XAUTHORITY,XDG_SESSION_TYPE,QT_X11_NO_MITSHM /usr/local/sbin/dev-sandbox-sshd
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${SANDBOX_XAUTHORITY_FILE:-/dev/null}:/tmp/dev-sandbox.Xauthority:ro
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XAUTHORITY=/tmp/dev-sandbox.Xauthority
+      - XDG_SESSION_TYPE=${XDG_SESSION_TYPE}
+      - QT_X11_NO_MITSHM=1
