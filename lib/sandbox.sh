@@ -15,7 +15,6 @@ SSH_PORT_MAX=22999
 UP_HELP_REQUESTED=0
 SANDBOX_DISPLAY_ENABLED=0
 SANDBOX_XAUTHORITY_FILE=""
-SANDBOX_AUTOWARE_DATA_DIR=""
 EXTRA_MOUNT_SOURCES=()
 EXTRA_MOUNT_TARGETS=()
 EXTRA_MOUNT_MODES=()
@@ -57,11 +56,11 @@ sandbox_resolve_platform() {
 
 sandbox_resolve_role() {
     case "${SANDBOX_ROLE:-base}" in
-        base|ros2-tools)
+        base|ros2-tools|ros2-rocm)
             printf '%s\n' "${SANDBOX_ROLE:-base}"
             ;;
         *)
-            echo "Invalid SANDBOX_ROLE: $SANDBOX_ROLE (expected base or ros2-tools)" >&2
+            echo "Invalid SANDBOX_ROLE: $SANDBOX_ROLE (expected base, ros2-tools, or ros2-rocm)" >&2
             return 1
             ;;
     esac
@@ -71,8 +70,8 @@ sandbox_check_role_platform() {
     local role=$1
     local platform=$2
 
-    if [[ $role == ros2-tools && $platform != rocm ]]; then
-        echo "SANDBOX_ROLE=ros2-tools is only supported with SANDBOX_PLATFORM=rocm." >&2
+    if [[ $role =~ ^ros2-(tools|rocm)$ && $platform != rocm ]]; then
+        echo "SANDBOX_ROLE=$role is only supported with SANDBOX_PLATFORM=rocm." >&2
         return 1
     fi
 }
@@ -109,7 +108,7 @@ sandbox_prepare_display_environment() {
 
     if [[ -z ${DISPLAY:-} ]]; then
         if [[ $required == required ]]; then
-            echo "DISPLAY is required for SANDBOX_ROLE=ros2-tools." >&2
+            echo "DISPLAY is required for this SANDBOX_ROLE." >&2
             return 1
         fi
         return
@@ -143,19 +142,8 @@ sandbox_prepare_role_environment() {
             sandbox_prepare_display_environment optional
             return
             ;;
-        ros2-tools)
+        ros2-tools|ros2-rocm)
             sandbox_prepare_display_environment required || return
-            SANDBOX_AUTOWARE_DATA_DIR=$(readlink -m -- "$HOME/autoware_data")
-            [[ -d $SANDBOX_AUTOWARE_DATA_DIR ]] || {
-                cat >&2 <<EOF
-Autoware data directory not found: $SANDBOX_AUTOWARE_DATA_DIR
-Create the CycloneDDS config before starting ros2-tools:
-
-  mkdir -p "$HOME/autoware_data/config"
-  $SANDBOX_DIR/scripts/make-cyclonedds-config --interface lo --output "$HOME/autoware_data/config/cyclonedds.xml"
-EOF
-                return 1
-            }
             ;;
     esac
 }
@@ -394,7 +382,7 @@ The default access mode is rw. Use HOST::ro for a read-only same-path mount.
 
 Environment:
   SANDBOX_PLATFORM=rocm|jetson
-  SANDBOX_ROLE=base|ros2-tools
+  SANDBOX_ROLE=base|ros2-tools|ros2-rocm
 
 Examples:
   $SANDBOX_DIR/up -v /data/models
@@ -580,8 +568,11 @@ sandbox_compose() {
         ros2-tools)
             compose_files+=(--file compose.ros2-tools-amd.yaml)
             ;;
+        ros2-rocm)
+            compose_files+=(--file compose.ros2-rocm-amd.yaml)
+            ;;
         *)
-            echo "Invalid SANDBOX_ROLE: $role (expected base or ros2-tools)" >&2
+            echo "Invalid SANDBOX_ROLE: $role (expected base, ros2-tools, or ros2-rocm)" >&2
             return 1
             ;;
     esac
@@ -597,10 +588,8 @@ sandbox_compose() {
         SANDBOX_SSH_PORT="${SSH_PORT:-2222}" \
         SANDBOX_SSH_AUTHORIZED_KEYS_FILE="$SSH_AUTHORIZED_KEYS_FILE" \
         SANDBOX_XAUTHORITY_FILE="${SANDBOX_XAUTHORITY_FILE:-/dev/null}" \
-        SANDBOX_AUTOWARE_DATA_DIR="${SANDBOX_AUTOWARE_DATA_DIR:-$HOME/autoware_data}" \
         DISPLAY="${DISPLAY:-}" \
         XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-}" \
-        ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-}" \
         podman-compose \
             "${compose_files[@]}" \
             "${extra_files[@]}" \

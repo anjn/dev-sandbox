@@ -62,7 +62,7 @@ GLの確認には`glxinfo`を使えます。
 
 ### ROS 2 tools role
 
-`SANDBOX_ROLE=ros2-tools`を指定すると、Strix HaloなどのAMD/ROCmホスト上でROS 2 CLI、RViz、DDS確認ツール用のコンテナを起動します。ホストにはROS 2をapt installしません。AWSIM binaryはホスト上で起動したまま、toolsコンテナからtopicやRVizを確認します。
+`SANDBOX_ROLE=ros2-tools`を指定すると、Strix HaloなどのAMD/ROCmホスト上でROS 2 CLI、RViz、DDS確認ツール用のコンテナを起動します。ホストにはROS 2をapt installしません。
 
 このroleは`SANDBOX_PLATFORM=rocm`専用です。通常のAI開発用sandboxは従来どおり`SANDBOX_ROLE`未指定、つまり`base`で起動します。
 
@@ -72,37 +72,20 @@ GLの確認には`glxinfo`を使えます。
 echo "$XDG_SESSION_TYPE"
 ```
 
-同一ホストで起動するAWSIMだけを見る場合は`lo`を指定してCycloneDDS設定を作成します。
-
-```bash
-/path/to/dev-sandbox/scripts/make-cyclonedds-config \
-  --interface lo \
-  --output ~/autoware_data/config/cyclonedds.xml
-```
-
-Jetson Autoware containerと接続確認するmulti-host構成では、`lo`の代わりに有線LAN NIC名を指定します。
-
-```bash
-/path/to/dev-sandbox/scripts/make-cyclonedds-config \
-  --interface enp5s0 \
-  --output ~/autoware_data/config/cyclonedds.xml
-```
-
-AWSIM binaryをホストで起動してから、workspaceへ移動してtoolsコンテナを起動します。`ROS_DOMAIN_ID`はAWSIMやJetson側と同じ値にしてください。
+workspaceへ移動してtoolsコンテナを起動します。
 
 ```bash
 cd /path/to/workspace
-ROS_DOMAIN_ID=0 \
 SANDBOX_ROLE=ros2-tools \
 SANDBOX_PLATFORM=rocm \
 /path/to/dev-sandbox/up
 ```
 
-コンテナ内でpreflight、topic確認、RViz起動を行います。multi-host構成では`--interface`へ有線LAN NIC名を指定します。
+コンテナ内でpreflight、topic確認、RViz起動を行います。必要なROS 2/DDS環境変数や追加ディレクトリのmountは、用途に合わせて明示的に設定してください。
 
 ```bash
-/path/to/dev-sandbox/exec preflight-ros2-tools --interface lo
-/path/to/dev-sandbox/exec check-awsim-topics
+/path/to/dev-sandbox/exec preflight-ros2-tools
+/path/to/dev-sandbox/exec bash -lc 'source /opt/ros/humble/setup.bash && ros2 topic list'
 /path/to/dev-sandbox/exec run-rviz
 ```
 
@@ -111,6 +94,34 @@ SANDBOX_PLATFORM=rocm \
 ```bash
 /path/to/dev-sandbox/exec bash -lc 'source /opt/ros/humble/setup.bash && ros2 topic list'
 /path/to/dev-sandbox/exec bash -lc 'source /opt/ros/humble/setup.bash && rviz2'
+```
+
+### ROS 2 + ROCm role
+
+`SANDBOX_ROLE=ros2-rocm`を指定すると、ROS 2 Humble toolsとROCm SDKを同じコンテナで使えます。`ros2-tools`は観測・RViz専用でROCm compute用の`/dev/kfd`やROCm userspaceを含まないため、ROCmも必要な作業ではこのroleを使います。
+
+```bash
+cd /path/to/workspace
+SANDBOX_ROLE=ros2-rocm \
+SANDBOX_PLATFORM=rocm \
+/path/to/dev-sandbox/up
+```
+
+起動後にROS 2、RViz、ROCm deviceをまとめて確認します。
+
+```bash
+/path/to/dev-sandbox/exec preflight-ros2-rocm
+/path/to/dev-sandbox/exec bash -lc 'source /opt/ros/humble/setup.bash && ros2 topic list'
+/path/to/dev-sandbox/exec rocminfo
+```
+
+既定のbase imageはROS 2 Humbleのdeb packageと合わせるため、Ubuntu 22.04系の`docker.io/rocm/dev-ubuntu-22.04:7.2.2-complete`です。PyTorch入りのROCm imageを試す場合は、同じくUbuntu 22.04系のimageを指定してbuildできます。
+
+```bash
+ROS2_ROCM_BASE_IMAGE=docker.io/rocm/pytorch:rocm7.2_ubuntu22.04_py3.10_pytorch_release_2.10.0 \
+SANDBOX_ROLE=ros2-rocm \
+SANDBOX_PLATFORM=rocm \
+/path/to/dev-sandbox/up
 ```
 
 JetsonではJetPack 6.2対応のNVIDIA PyTorch 25.02 iGPUイメージを使用します。初回起動前に、下記ドキュメントに従ってPodmanとGPU用CDI deviceを準備してください。

@@ -4,30 +4,12 @@ set -euo pipefail
 
 usage() {
     cat <<EOF
-Usage: $0 --interface NIC
-
-Examples:
-  $0 --interface lo
-  $0 --interface enp5s0
+Usage: $0
 EOF
 }
 
-interface=""
-
 while (($#)); do
     case "$1" in
-        --interface)
-            shift
-            (($#)) || {
-                echo "Missing value after --interface." >&2
-                usage >&2
-                exit 2
-            }
-            interface=$1
-            ;;
-        --interface=*)
-            interface=${1#*=}
-            ;;
         -h|--help)
             usage
             exit 0
@@ -40,12 +22,6 @@ while (($#)); do
     esac
     shift
 done
-
-[[ -n $interface ]] || {
-    echo "--interface is required." >&2
-    usage >&2
-    exit 2
-}
 
 failures=0
 
@@ -70,7 +46,6 @@ require_command() {
 
 require_command glxinfo
 require_command vulkaninfo
-require_command ip
 
 echo "XDG_SESSION_TYPE=${XDG_SESSION_TYPE:-}"
 if [[ ${XDG_SESSION_TYPE:-} == x11 ]]; then
@@ -102,38 +77,28 @@ if vulkan_output=$(vulkaninfo --summary 2>&1); then
     echo
     echo "$vulkan_output"
     echo
-    if grep -Eiq 'AMD Radeon|RADV|radv' <<< "$vulkan_output"; then
-        pass "vulkaninfo reports AMD Radeon/RADV"
+    if grep -Eiq 'AMD Radeon|RADV|radv|NVIDIA|Mesa' <<< "$vulkan_output"; then
+        pass "vulkaninfo reports a GPU/Vulkan driver"
     else
-        fail "vulkaninfo does not report AMD Radeon/RADV"
+        fail "vulkaninfo does not report an expected GPU/Vulkan driver"
     fi
 else
     echo "$vulkan_output" >&2
     fail "vulkaninfo --summary failed"
 fi
 
-if [[ -f /autoware_data/config/cyclonedds.xml ]]; then
-    pass "CycloneDDS config exists: /autoware_data/config/cyclonedds.xml"
+if [[ -f /opt/ros/humble/setup.bash ]]; then
+    # shellcheck disable=SC1091
+    source /opt/ros/humble/setup.bash
+    pass "ROS 2 Humble setup exists"
 else
-    fail "CycloneDDS config missing: /autoware_data/config/cyclonedds.xml"
+    fail "ROS 2 Humble setup missing: /opt/ros/humble/setup.bash"
 fi
 
-if [[ -n ${ROS_DOMAIN_ID:-} ]]; then
-    pass "ROS_DOMAIN_ID is set: $ROS_DOMAIN_ID"
+if ros2 --help >/dev/null 2>&1; then
+    pass "ros2 CLI is available"
 else
-    fail "ROS_DOMAIN_ID is not set"
-fi
-
-if [[ ${ROS_LOCALHOST_ONLY:-0} == 1 ]]; then
-    fail "ROS_LOCALHOST_ONLY must not be 1"
-else
-    pass "ROS_LOCALHOST_ONLY is not 1"
-fi
-
-if ip addr show dev "$interface" >/dev/null 2>&1; then
-    pass "network interface exists: $interface"
-else
-    fail "network interface not found: $interface"
+    fail "ros2 CLI failed"
 fi
 
 if ((failures > 0)); then

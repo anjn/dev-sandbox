@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+    cat <<EOF
+Usage: $0
+EOF
+}
+
+while (($#)); do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+
+preflight-ros2-tools
+
+failures=0
+
+pass() {
+    printf '[OK] %s\n' "$1"
+}
+
+fail() {
+    printf '[FAIL] %s\n' "$1" >&2
+    failures=$((failures + 1))
+}
+
+if [[ -e /dev/kfd ]]; then
+    pass "ROCm compute device exists: /dev/kfd"
+else
+    fail "ROCm compute device missing: /dev/kfd"
+fi
+
+if [[ -d /dev/dri ]]; then
+    pass "DRI device directory exists: /dev/dri"
+else
+    fail "DRI device directory missing: /dev/dri"
+fi
+
+if command -v rocminfo >/dev/null 2>&1; then
+    if rocminfo >/tmp/dev-sandbox-rocminfo.txt 2>&1; then
+        pass "rocminfo succeeded"
+        grep -E 'Name:|Marketing Name:|gfx' /tmp/dev-sandbox-rocminfo.txt | sed -n '1,40p' || true
+    else
+        sed -n '1,120p' /tmp/dev-sandbox-rocminfo.txt >&2
+        fail "rocminfo failed"
+    fi
+else
+    fail "rocminfo command not found"
+fi
+
+if command -v amd-smi >/dev/null 2>&1; then
+    amd-smi list || fail "amd-smi list failed"
+elif command -v rocm-smi >/dev/null 2>&1; then
+    rocm-smi || fail "rocm-smi failed"
+else
+    echo "amd-smi/rocm-smi not found; skipping SMI check."
+fi
+
+if ((failures > 0)); then
+    echo
+    echo "ROCm preflight failed with $failures issue(s)." >&2
+    exit 1
+fi
+
+echo
+echo "ROCm preflight passed."

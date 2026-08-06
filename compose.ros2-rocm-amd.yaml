@@ -2,13 +2,16 @@ services:
   dev:
     build:
       context: .
-      dockerfile: Containerfile.ros2-tools-humble
-    image: dev-sandbox-ros2-tools-amd
+      dockerfile: Containerfile.ros2-rocm-humble
+      args:
+        BASE_IMAGE: ${ROS2_ROCM_BASE_IMAGE:-docker.io/rocm/dev-ubuntu-22.04:7.2.2-complete}
+    image: dev-sandbox-ros2-rocm-amd
     command: sudo --preserve-env=SANDBOX_SSH_PORT,DISPLAY,XAUTHORITY,XDG_SESSION_TYPE /usr/local/sbin/dev-sandbox-sshd
     network_mode: host
     userns_mode: keep-id
     ipc: host
     devices:
+      - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
       - /dev/snd:/dev/snd
     volumes:

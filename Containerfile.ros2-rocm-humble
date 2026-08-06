@@ -1,4 +1,7 @@
-FROM docker.io/osrf/ros:humble-desktop
+ARG BASE_IMAGE=docker.io/rocm/dev-ubuntu-22.04:7.2.2-complete
+FROM ${BASE_IMAGE}
+
+ARG ROS_APT_SOURCE_URL=http://packages.ros.org/ros2/ubuntu
 
 USER root
 
@@ -13,9 +16,27 @@ RUN getent group ubuntu >/dev/null || groupadd --gid 1000 ubuntu; \
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 RUN apt-get update && \
-    rqt_packages=$(apt-cache pkgnames ros-humble-rqt | grep -Ev -- '-dbgsym$' | sort) && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ca-certificates \
+    curl \
+    gnupg \
+    locales \
+    software-properties-common && \
+    add-apt-repository -y universe && \
+    curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+        -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    . /etc/os-release && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] $ROS_APT_SOURCE_URL $UBUNTU_CODENAME main" \
+        > /etc/apt/sources.list.d/ros2.list && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && \
+    rqt_packages=$(apt-cache pkgnames ros-humble-rqt | grep -Ev -- '-dbgsym$' | sort) && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    git-lfs \
     iproute2 \
     jq \
     less \
@@ -25,6 +46,9 @@ RUN apt-get update && \
     mesa-vulkan-drivers \
     net-tools \
     openssh-server \
+    pkg-config \
+    python3-pip \
+    python3-yaml \
     ros-humble-compressed-image-transport \
     ros-humble-image-transport \
     ros-humble-rmw-cyclonedds-cpp \
@@ -36,6 +60,8 @@ RUN apt-get update && \
     tcpdump \
     vim \
     vulkan-tools \
+    x11-apps \
+    xauth \
     $rqt_packages && \
     locale-gen ja_JP.UTF-8 && update-locale LANG=ja_JP.UTF-8 && \
     usermod -aG sudo ubuntu && \
@@ -46,10 +72,11 @@ RUN apt-get update && \
 
 COPY container/sshd_config /etc/ssh/sshd_config.d/99-dev-sandbox.conf
 COPY container/start-sshd /usr/local/sbin/dev-sandbox-sshd
-COPY scripts/preflight-ros2-tools scripts/run-rviz /usr/local/bin/
+COPY scripts/preflight-ros2-tools scripts/preflight-ros2-rocm scripts/run-rviz /usr/local/bin/
 
 RUN chmod 0755 /usr/local/sbin/dev-sandbox-sshd \
     /usr/local/bin/preflight-ros2-tools \
+    /usr/local/bin/preflight-ros2-rocm \
     /usr/local/bin/run-rviz && \
     passwd -d ubuntu && \
     printf '\nsource /opt/ros/humble/setup.bash\n' >> /home/ubuntu/.bashrc && \
