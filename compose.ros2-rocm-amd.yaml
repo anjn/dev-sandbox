@@ -5,8 +5,9 @@ services:
       dockerfile: Containerfile.ros2-rocm-humble
       args:
         BASE_IMAGE: ${ROS2_ROCM_BASE_IMAGE:-docker.io/rocm/dev-ubuntu-22.04:7.2.2-complete}
+        MESA_APT_PPA: ${ROS2_ROCM_MESA_APT_PPA-ppa:kisak/turtle}
     image: dev-sandbox-ros2-rocm-amd
-    command: sudo --preserve-env=SANDBOX_SSH_PORT,DISPLAY,XAUTHORITY,XDG_SESSION_TYPE /usr/local/sbin/dev-sandbox-sshd
+    command: sudo --preserve-env=SANDBOX_SSH_PORT,DISPLAY,XAUTHORITY,XDG_SESSION_TYPE,XDG_RUNTIME_DIR /usr/local/sbin/dev-sandbox-sshd
     network_mode: host
     userns_mode: keep-id
     ipc: host
@@ -21,3 +22,4 @@ services:
       - DISPLAY=${DISPLAY}
       - XAUTHORITY=/tmp/dev-sandbox.Xauthority
       - XDG_SESSION_TYPE=${XDG_SESSION_TYPE}
+      - XDG_RUNTIME_DIR=/tmp/runtime-ubuntu

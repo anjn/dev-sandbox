@@ -36,6 +36,12 @@ fail() {
     failures=$((failures + 1))
 }
 
+if [[ -n ${XDG_RUNTIME_DIR:-} && -d $XDG_RUNTIME_DIR ]]; then
+    pass "XDG_RUNTIME_DIR exists: $XDG_RUNTIME_DIR"
+else
+    fail "XDG_RUNTIME_DIR is not set to an existing directory"
+fi
+
 if [[ -e /dev/kfd ]]; then
     pass "ROCm compute device exists: /dev/kfd"
 else

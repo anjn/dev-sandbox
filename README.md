@@ -124,6 +124,15 @@ SANDBOX_PLATFORM=rocm \
 /path/to/dev-sandbox/up
 ```
 
+Strix Haloでcontainer内の`vulkaninfo`がGPUを認識しない場合に備え、`ros2-rocm` imageは既定でJammy向けのKisak Mesa stable PPAからMesa/RADVを取得します。別のMesa package sourceを使う場合は`ROS2_ROCM_MESA_APT_PPA`を指定します。空文字にすると追加PPAを使いません。
+
+```bash
+ROS2_ROCM_MESA_APT_PPA= \
+SANDBOX_ROLE=ros2-rocm \
+SANDBOX_PLATFORM=rocm \
+/path/to/dev-sandbox/up
+```
+
 JetsonではJetPack 6.2対応のNVIDIA PyTorch 25.02 iGPUイメージを使用します。初回起動前に、下記ドキュメントに従ってPodmanとGPU用CDI deviceを準備してください。
 
 JetsonイメージのUbuntu ports mirrorは、デフォルトで山形大学のmirrorを使用します。別のmirrorでbuildする場合は`UBUNTU_PORTS_MIRROR` build argumentを指定します。ROCmイメージの`archive.ubuntu.com`は置換されません。

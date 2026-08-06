@@ -1,6 +1,7 @@
 ARG BASE_IMAGE=docker.io/rocm/dev-ubuntu-22.04:7.2.2-complete
 FROM ${BASE_IMAGE}
 
+ARG MESA_APT_PPA=ppa:kisak/turtle
 ARG ROS_APT_SOURCE_URL=http://packages.ros.org/ros2/ubuntu
 
 USER root
@@ -28,6 +29,7 @@ RUN apt-get update && \
     . /etc/os-release && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] $ROS_APT_SOURCE_URL $UBUNTU_CODENAME main" \
         > /etc/apt/sources.list.d/ros2.list && \
+    if [ -n "$MESA_APT_PPA" ]; then add-apt-repository -y "$MESA_APT_PPA"; fi && \
     rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && \
@@ -78,6 +80,7 @@ RUN chmod 0755 /usr/local/sbin/dev-sandbox-sshd \
     /usr/local/bin/preflight-ros2-tools \
     /usr/local/bin/preflight-ros2-rocm \
     /usr/local/bin/run-rviz && \
+    install -d -m 0700 -o ubuntu -g ubuntu /tmp/runtime-ubuntu && \
     passwd -d ubuntu && \
     printf '\nsource /opt/ros/humble/setup.bash\n' >> /home/ubuntu/.bashrc && \
     chown ubuntu:ubuntu /home/ubuntu/.bashrc
