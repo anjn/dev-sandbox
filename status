@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(dirname -- "$(readlink -f -- "$0")")/lib/sandbox.sh"
+
+sandbox_print_status_usage() {
+    cat <<EOF
+Usage: $SANDBOX_DIR/status
+
+List dev-sandbox containers and saved SSH port reservations.
+Colors are enabled for terminals. Set NO_COLOR=1 to disable them or FORCE_COLOR=1 to enable them.
+EOF
+}
+
+if (($#)); then
+    case "$1" in
+        -h|--help)
+            if (($# == 1)); then
+                sandbox_print_status_usage
+                exit 0
+            fi
+            ;;
+    esac
+    echo "Unknown status argument: $1" >&2
+    sandbox_print_status_usage >&2
+    exit 2
+fi
+
+sandbox_require_commands awk date podman sort
+
+declare -A known=()
+declare -A container_present=()
+declare -A statuses=()
+declare -A ssh_ports=()
+declare -A roles=()
+declare -A platforms=()
+declare -A images=()
+declare -A last_started=()
+declare -A workspaces=()
+
+inspect_template='STATUS={{.State.Status}}
+STARTED={{.State.StartedAt}}
+IMAGE={{.ImageName}}
+MANAGED={{index .Config.Labels "io.github.anjn.dev-sandbox.managed"}}
+WORKSPACE_LABEL={{index .Config.Labels "io.github.anjn.dev-sandbox.workspace"}}
+ROLE={{index .Config.Labels "io.github.anjn.dev-sandbox.role"}}
+PLATFORM={{index .Config.Labels "io.github.anjn.dev-sandbox.platform"}}
+COMPOSE_SERVICE={{index .Config.Labels "com.docker.compose.service"}}
+COMPOSE_PROJECT={{index .Config.Labels "com.docker.compose.project"}}
+{{range .Config.Env}}ENV={{println .}}{{end}}{{range .Mounts}}{{if eq .Destination "/workspace"}}WORKSPACE_MOUNT={{println .Source}}{{end}}{{end}}'
+
+container_output=$(podman ps -a --filter 'name=^dev-sandbox-' --format '{{.Names}}')
+while IFS= read -r container_name; do
+    [[ -n $container_name ]] || continue
+
+    inspect_output=$(podman inspect --format "$inspect_template" "$container_name")
+    status_value=""
+    started_value=""
+    image_value=""
+    managed_value=""
+    workspace_label_value=""
+    workspace_mount_value=""
+    role_value=""
+    platform_value=""
+    compose_service_value=""
+    compose_project_value=""
+    port_value=""
+
+    while IFS= read -r inspect_line; do
+        case "$inspect_line" in
+            STATUS=*)
+                status_value=${inspect_line#STATUS=}
+                ;;
+            STARTED=*)
+                started_value=${inspect_line#STARTED=}
+                ;;
+            IMAGE=*)
+                image_value=${inspect_line#IMAGE=}
+                ;;
+            MANAGED=*)
+                managed_value=${inspect_line#MANAGED=}
+                ;;
+            WORKSPACE_LABEL=*)
+                workspace_label_value=${inspect_line#WORKSPACE_LABEL=}
+                ;;
+            WORKSPACE_MOUNT=*)
+                workspace_mount_value=${inspect_line#WORKSPACE_MOUNT=}
+                ;;
+            ROLE=*)
+                role_value=${inspect_line#ROLE=}
+                ;;
+            PLATFORM=*)
+                platform_value=${inspect_line#PLATFORM=}
+                ;;
+            COMPOSE_SERVICE=*)
+                compose_service_value=${inspect_line#COMPOSE_SERVICE=}
+                ;;
+            COMPOSE_PROJECT=*)
+                compose_project_value=${inspect_line#COMPOSE_PROJECT=}
+                ;;
+            ENV=SANDBOX_SSH_PORT=*)
+                port_value=${inspect_line#ENV=SANDBOX_SSH_PORT=}
+                ;;
+        esac
+    done <<< "$inspect_output"
+
+    if [[ $managed_value != true ]] &&
+        [[ $compose_service_value != dev || $compose_project_value != "$container_name" ]]; then
+        continue
+    fi
+
+    known["$container_name"]=1
+    container_present["$container_name"]=1
+    statuses["$container_name"]=$status_value
+    images["$container_name"]=$image_value
+    last_started["$container_name"]=$started_value
+    roles["$container_name"]=$role_value
+    platforms["$container_name"]=$platform_value
+    workspaces["$container_name"]=${workspace_label_value:-$workspace_mount_value}
+    if sandbox_validate_ssh_port "$port_value"; then
+        ssh_ports["$container_name"]=$port_value
+    fi
+done <<< "$container_output"
+
+if [[ -d $SANDBOX_STATE_DIR ]]; then
+    shopt -s nullglob
+    for reservation_file in "$SANDBOX_STATE_DIR"/*.ssh-port; do
+        container_name=$(basename -- "$reservation_file" .ssh-port)
+        IFS= read -r port_value < "$reservation_file" || true
+        if ! sandbox_validate_ssh_port "$port_value"; then
+            echo "Ignoring invalid SSH port reservation: $reservation_file" >&2
+            continue
+        fi
+
+        known["$container_name"]=1
+        if [[ -z ${container_present["$container_name"]:-} ]]; then
+            statuses["$container_name"]=reserved
+        fi
+        if [[ -z ${ssh_ports["$container_name"]:-} ]]; then
+            ssh_ports["$container_name"]=$port_value
+        fi
+    done
+    shopt -u nullglob
+fi
+
+if ((${#known[@]} == 0)); then
+    echo "No dev sandboxes found."
+    exit 0
+fi
+
+for container_name in "${!known[@]}"; do
+    metadata_file="$SANDBOX_STATE_DIR/$container_name.metadata"
+    if sandbox_read_metadata "$metadata_file"; then
+        [[ -n ${workspaces["$container_name"]:-} ]] || workspaces["$container_name"]=$METADATA_WORKSPACE
+        [[ -n ${roles["$container_name"]:-} ]] || roles["$container_name"]=$METADATA_ROLE
+        [[ -n ${platforms["$container_name"]:-} ]] || platforms["$container_name"]=$METADATA_PLATFORM
+        [[ -n ${images["$container_name"]:-} ]] || images["$container_name"]=$METADATA_IMAGE
+        [[ -n ${last_started["$container_name"]:-} ]] || last_started["$container_name"]=$METADATA_LAST_STARTED
+    fi
+
+    image_value=${images["$container_name"]:-}
+    image_basename=${image_value##*/}
+    image_basename=${image_basename%%:*}
+    case "$image_basename" in
+        dev-sandbox-rocm)
+            [[ -n ${roles["$container_name"]:-} ]] || roles["$container_name"]=base
+            [[ -n ${platforms["$container_name"]:-} ]] || platforms["$container_name"]=rocm
+            ;;
+        dev-sandbox-jetson)
+            [[ -n ${roles["$container_name"]:-} ]] || roles["$container_name"]=base
+            [[ -n ${platforms["$container_name"]:-} ]] || platforms["$container_name"]=jetson
+            ;;
+        dev-sandbox-ros2-tools-amd)
+            [[ -n ${roles["$container_name"]:-} ]] || roles["$container_name"]=ros2-tools
+            [[ -n ${platforms["$container_name"]:-} ]] || platforms["$container_name"]=rocm
+            ;;
+        dev-sandbox-ros2-rocm-amd)
+            [[ -n ${roles["$container_name"]:-} ]] || roles["$container_name"]=ros2-rocm
+            [[ -n ${platforms["$container_name"]:-} ]] || platforms["$container_name"]=rocm
+            ;;
+    esac
+done
+
+sandbox_status_value() {
+    local value=${1:-}
+
+    value=${value//$'\t'/ }
+    value=${value//$'\n'/ }
+    value=${value//$'\r'/ }
+    printf '%s' "${value:--}"
+}
+
+sandbox_status_time() {
+    local raw_value=${1:-}
+    local formatted_value
+    local parse_value=$raw_value
+
+    if [[ -z $raw_value || $raw_value == 0001-* ]]; then
+        printf '%s' '-'
+    else
+        if [[ $parse_value =~ [[:space:]][+-][0-9]{4}[[:space:]][[:alpha:]]+$ ]]; then
+            parse_value=${parse_value% *}
+        fi
+        if formatted_value=$(date --date="$parse_value" --iso-8601=seconds 2>/dev/null); then
+            printf '%s' "$formatted_value"
+        else
+            sandbox_status_value "$raw_value"
+        fi
+    fi
+}
+
+mapfile -t sorted_names < <(printf '%s\n' "${!known[@]}" | LC_ALL=C sort)
+
+color_enabled=0
+if [[ -z ${NO_COLOR:-} ]] && { [[ -t 1 ]] || [[ ${FORCE_COLOR:-} == 1 ]]; }; then
+    color_enabled=1
+fi
+
+{
+    printf 'NAME\tSTATUS\tSSH_PORT\tROLE\tPLATFORM\tLAST_STARTED\tWORKSPACE\n'
+    for container_name in "${sorted_names[@]}"; do
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+            "$(sandbox_status_value "$container_name")" \
+            "$(sandbox_status_value "${statuses["$container_name"]:-}")" \
+            "$(sandbox_status_value "${ssh_ports["$container_name"]:-}")" \
+            "$(sandbox_status_value "${roles["$container_name"]:-}")" \
+            "$(sandbox_status_value "${platforms["$container_name"]:-}")" \
+            "$(sandbox_status_time "${last_started["$container_name"]:-}")" \
+            "$(sandbox_status_value "${workspaces["$container_name"]:-}")"
+    done
+} | awk -F '\t' -v color_enabled="$color_enabled" '
+    function status_color(value) {
+        if (value == "running") {
+            return green
+        }
+        if (value == "reserved") {
+            return cyan
+        }
+        if (value == "created" || value == "configured" || value == "initialized" || value == "paused") {
+            return yellow
+        }
+        if (value == "exited" || value == "stopped" || value == "removing" || value == "stopping") {
+            return red
+        }
+        return ""
+    }
+    function platform_color(value) {
+        if (value == "rocm") {
+            return magenta
+        }
+        if (value == "jetson") {
+            return green
+        }
+        return ""
+    }
+    BEGIN {
+        escape = sprintf("%c", 27)
+        reset = escape "[0m"
+        bold = escape "[1m"
+        red = escape "[31m"
+        green = escape "[32m"
+        yellow = escape "[33m"
+        magenta = escape "[35m"
+        cyan = escape "[36m"
+    }
+    {
+        row_count = NR
+        field_count = NF
+        for (field = 1; field <= NF; field++) {
+            cells[NR, field] = $field
+            if (length($field) > widths[field]) {
+                widths[field] = length($field)
+            }
+        }
+    }
+    END {
+        for (row = 1; row <= row_count; row++) {
+            line = ""
+            for (field = 1; field <= field_count; field++) {
+                if (field < field_count) {
+                    formatted = sprintf("%-*s  ", widths[field], cells[row, field])
+                } else {
+                    formatted = cells[row, field]
+                }
+                if (color_enabled && row > 1 && field == 2 && status_color(cells[row, field]) != "") {
+                    formatted = status_color(cells[row, field]) formatted reset
+                } else if (color_enabled && row > 1 && field == 5 && platform_color(cells[row, field]) != "") {
+                    formatted = platform_color(cells[row, field]) formatted reset
+                }
+                line = line formatted
+            }
+            if (color_enabled && row == 1) {
+                print bold line reset
+            } else {
+                print line
+            }
+        }
+    }
+'

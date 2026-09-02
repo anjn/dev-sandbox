@@ -2,6 +2,11 @@ services:
   dev:
     container_name: ${CONTAINER_NAME}
     restart: always
+    labels:
+      io.github.anjn.dev-sandbox.managed: "true"
+      io.github.anjn.dev-sandbox.workspace: ${WORKSPACE_DIR}
+      io.github.anjn.dev-sandbox.role: ${SANDBOX_ROLE_RESOLVED:-base}
+      io.github.anjn.dev-sandbox.platform: ${SANDBOX_PLATFORM_RESOLVED:-unknown}
     build:
       context: .
       dockerfile: Containerfile

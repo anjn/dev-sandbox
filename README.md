@@ -203,6 +203,20 @@ ssh -p 22000 -i ~/.ssh/dev-sandbox ubuntu@jetson-host
 SANDBOX_SSH_PORT=2222 /path/to/dev-sandbox/up
 ```
 
+起動後のSSHポートやworkspaceをまとめて確認するには、任意のディレクトリから`status`を実行します。
+
+```bash
+/path/to/dev-sandbox/status
+```
+
+```text
+NAME                                         STATUS    SSH_PORT  ROLE  PLATFORM  LAST_STARTED              WORKSPACE
+dev-sandbox-cuda-hip-migration-customer      running   22002     base  rocm      2026-09-01T10:26:41+09:00  /home/user/work/cuda-hip-migration-customer
+dev-sandbox-old-workspace                     reserved  22003     -     -         -                         -
+```
+
+`status`は稼働中・停止中のコンテナと、コンテナ削除後も残るSSHポート予約を一覧表示します。`reserved`はコンテナが存在せず、ポート予約だけが残っている状態です。以前のバージョンで作成した予約では、SSHポート以外の情報が`-`になることがあります。予約は表示時に削除されません。端末では見出し、状態、platformが装飾されます。装飾を無効にする場合は`NO_COLOR=1`、リダイレクト先でも有効にする場合は`FORCE_COLOR=1`を指定します。
+
 SSH serverはホストのネットワーク上で待ち受けます。インターネットに直接公開せず、LAN/VPNとホスト側firewallで接続元を制限してください。パスワード認証とrootログインは無効です。
 
 ## ホスト再起動後の自動起動

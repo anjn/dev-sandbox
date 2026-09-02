@@ -9,6 +9,7 @@ SANDBOX_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dev-sandbox"
 SSH_AUTHORIZED_KEYS_FILE="${SANDBOX_SSH_AUTHORIZED_KEYS_FILE:-$SANDBOX_CONFIG_DIR/authorized_keys}"
 SSH_IDENTITY_FILE="${SANDBOX_SSH_IDENTITY_FILE:-~/.ssh/dev-sandbox}"
 SSH_PORT_STATE_FILE="$SANDBOX_STATE_DIR/$CONTAINER_NAME.ssh-port"
+SANDBOX_METADATA_STATE_FILE="$SANDBOX_STATE_DIR/$CONTAINER_NAME.metadata"
 SSH_PORT="${SANDBOX_SSH_PORT:-}"
 SSH_PORT_MIN=22000
 SSH_PORT_MAX=22999
@@ -232,6 +233,74 @@ sandbox_write_ssh_port() {
     umask 077
     printf '%s\n' "$port" > "$temporary_file"
     mv -f -- "$temporary_file" "$SSH_PORT_STATE_FILE"
+}
+
+sandbox_write_metadata() (
+    local role=$1
+    local platform=$2
+    local image
+    local last_started
+    local temporary_file="$SANDBOX_METADATA_STATE_FILE.$$"
+
+    image=$(podman inspect --format '{{.ImageName}}' "$CONTAINER_NAME")
+    last_started=$(podman inspect --format '{{.State.StartedAt}}' "$CONTAINER_NAME")
+
+    umask 077
+    {
+        printf 'version=1\n'
+        printf 'workspace=%s\n' "$WORKSPACE_DIR"
+        printf 'role=%s\n' "$role"
+        printf 'platform=%s\n' "$platform"
+        printf 'image=%s\n' "$image"
+        printf 'last_started=%s\n' "$last_started"
+    } > "$temporary_file"
+    mv -f -- "$temporary_file" "$SANDBOX_METADATA_STATE_FILE"
+)
+
+sandbox_read_metadata() {
+    local metadata_file=$1
+    local key
+    local line
+    local value
+
+    METADATA_WORKSPACE=""
+    METADATA_ROLE=""
+    METADATA_PLATFORM=""
+    METADATA_IMAGE=""
+    METADATA_LAST_STARTED=""
+
+    [[ -f $metadata_file ]] || return 1
+
+    while IFS= read -r line || [[ -n $line ]]; do
+        [[ $line == *=* ]] || continue
+        key=${line%%=*}
+        value=${line#*=}
+        case "$key" in
+            workspace)
+                METADATA_WORKSPACE=$value
+                ;;
+            role)
+                case "$value" in
+                    base|ros2-tools|ros2-rocm)
+                        METADATA_ROLE=$value
+                        ;;
+                esac
+                ;;
+            platform)
+                case "$value" in
+                    rocm|jetson)
+                        METADATA_PLATFORM=$value
+                        ;;
+                esac
+                ;;
+            image)
+                METADATA_IMAGE=$value
+                ;;
+            last_started)
+                METADATA_LAST_STARTED=$value
+                ;;
+        esac
+    done < "$metadata_file"
 }
 
 sandbox_allocate_ssh_port() (
@@ -585,6 +654,8 @@ sandbox_compose() {
         cd -- "$SANDBOX_DIR"
         CONTAINER_NAME="$CONTAINER_NAME" \
         WORKSPACE_DIR="$WORKSPACE_DIR" \
+        SANDBOX_ROLE_RESOLVED="$role" \
+        SANDBOX_PLATFORM_RESOLVED="$platform" \
         SANDBOX_SSH_PORT="${SSH_PORT:-2222}" \
         SANDBOX_SSH_AUTHORIZED_KEYS_FILE="$SSH_AUTHORIZED_KEYS_FILE" \
         SANDBOX_XAUTHORITY_FILE="${SANDBOX_XAUTHORITY_FILE:-/dev/null}" \

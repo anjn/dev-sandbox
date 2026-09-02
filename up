@@ -38,5 +38,6 @@ else
     sandbox_compose "$platform" "$role" up -d
 fi
 
+sandbox_write_metadata "$role" "$platform"
 podman ps -a
 sandbox_print_ssh_info
