@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(dirname -- "$(readlink -f -- "$0")")/lib/sandbox.sh"
+
+sandbox_require_commands podman
+
+if ! podman container exists "$CONTAINER_NAME"; then
+    cat >&2 <<EOF
+Sandbox container not found for workspace: $WORKSPACE_DIR
+Run $SANDBOX_DIR/up to create it.
+EOF
+    exit 1
+fi
+
+if [[ $(podman inspect --format '{{.State.Running}}' "$CONTAINER_NAME") == true ]]; then
+    echo "$CONTAINER_NAME is already running."
+else
+    podman start "$CONTAINER_NAME"
+fi
+
+if [[ $(podman inspect --format '{{.State.Running}}' "$CONTAINER_NAME") != true ]]; then
+    container_status=$(podman inspect --format '{{.State.Status}}' "$CONTAINER_NAME")
+    echo "Sandbox container did not stay running: $CONTAINER_NAME (status: $container_status)" >&2
+    exit 1
+fi
+
+if ! sandbox_refresh_metadata_last_started; then
+    echo "Warning: failed to refresh sandbox metadata: $SANDBOX_METADATA_STATE_FILE" >&2
+fi
+
+SSH_PORT=""
+SSH_PORT=$(sandbox_running_ssh_port 2>/dev/null || sandbox_read_ssh_port 2>/dev/null || true)
+if [[ -n $SSH_PORT ]]; then
+    sandbox_print_ssh_info
+else
+    echo "Warning: SSH port information is unavailable for $CONTAINER_NAME." >&2
+fi

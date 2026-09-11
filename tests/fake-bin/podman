@@ -3,6 +3,19 @@
 set -euo pipefail
 
 case "${1:-}" in
+    container)
+        if [[ ${2:-} == exists && -f $FAKE_PODMAN_DATA/exists.${3:-} ]]; then
+            exit 0
+        fi
+        exit 1
+        ;;
+    start)
+        container_name=${2:-}
+        [[ -f $FAKE_PODMAN_DATA/exists.$container_name ]] || exit 1
+        printf '%s\n' true > "$FAKE_PODMAN_DATA/running.$container_name"
+        printf '%s\n' "$container_name" >> "$FAKE_PODMAN_DATA/start.log"
+        printf '%s\n' "$container_name"
+        ;;
     ps)
         if [[ ${FAKE_PODMAN_PS_FAIL:-0} == 1 ]]; then
             echo "fake podman ps failure" >&2
@@ -33,11 +46,28 @@ case "${1:-}" in
             exit 1
         }
         case "$format" in
+            '{{.State.Running}}')
+                if [[ -f $FAKE_PODMAN_DATA/running.$container_name ]]; then
+                    cat -- "$FAKE_PODMAN_DATA/running.$container_name"
+                else
+                    printf '%s\n' false
+                fi
+                ;;
+            '{{.State.Status}}')
+                if [[ $(< "$FAKE_PODMAN_DATA/running.$container_name") == true ]]; then
+                    printf '%s\n' running
+                else
+                    printf '%s\n' exited
+                fi
+                ;;
             '{{.ImageName}}')
                 sed -n 's/^IMAGE=//p' "$fixture"
                 ;;
             '{{.State.StartedAt}}')
                 sed -n 's/^STARTED=//p' "$fixture"
+                ;;
+            '{{range .Config.Env}}{{println .}}{{end}}')
+                printf 'SANDBOX_SSH_PORT=%s\n' "$(< "$FAKE_PODMAN_DATA/port.$container_name")"
                 ;;
             *)
                 cat -- "$fixture"

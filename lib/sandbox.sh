@@ -303,6 +303,30 @@ sandbox_read_metadata() {
     done < "$metadata_file"
 }
 
+sandbox_refresh_metadata_last_started() (
+    local found=0
+    local last_started
+    local line
+    local temporary_file="$SANDBOX_METADATA_STATE_FILE.$$"
+
+    [[ -f $SANDBOX_METADATA_STATE_FILE ]] || return 0
+    last_started=$(podman inspect --format '{{.State.StartedAt}}' "$CONTAINER_NAME")
+
+    umask 077
+    while IFS= read -r line || [[ -n $line ]]; do
+        if [[ $line == last_started=* ]]; then
+            printf 'last_started=%s\n' "$last_started"
+            found=1
+        else
+            printf '%s\n' "$line"
+        fi
+    done < "$SANDBOX_METADATA_STATE_FILE" > "$temporary_file"
+    if ((!found)); then
+        printf 'last_started=%s\n' "$last_started" >> "$temporary_file"
+    fi
+    mv -f -- "$temporary_file" "$SANDBOX_METADATA_STATE_FILE"
+)
+
 sandbox_allocate_ssh_port() (
     local lock_fd
     local port

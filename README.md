@@ -13,6 +13,15 @@ cd /path/to/workspace
 /path/to/dev-sandbox/down
 ```
 
+`status`で`exited`になっている既存sandboxは、workspaceへ移動して`start`を実行すると、mount、環境変数、SSHポートなどの既存設定を変えずに再起動できます。
+
+```bash
+cd /path/to/workspace
+/path/to/dev-sandbox/start
+```
+
+コンテナが削除済みで`reserved`になっている場合は、`start`ではなく`up`で再作成してください。
+
 ### 追加ディレクトリのmount
 
 `up`の`-v`または`--volume`を繰り返し指定すると、workspace以外のホストディレクトリもbind mountできます。コンテナ側パスを省略した場合は、ホストの絶対パスと同じ場所へread-writeでmountします。
