@@ -32,5 +32,8 @@ services:
     stdin_open: true
     tty: true
 
+x-podman:
+  in_pod: false
+
 volumes:
   ssh-host-keys:
