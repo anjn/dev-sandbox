@@ -13,22 +13,20 @@ role=$(sandbox_resolve_role)
 platform=$(sandbox_resolve_platform)
 sandbox_check_role_platform "$role" "$platform"
 
-sandbox_require_commands flock install podman podman-compose ssh-keygen ss stat
+sandbox_require_commands flock install mktemp mv podman podman-compose ssh-keygen ss stat
 if ((${#EXTRA_MOUNT_SOURCES[@]})); then
-    sandbox_require_commands mktemp python3
+    sandbox_require_commands python3
 fi
 if [[ $role == base && $platform == jetson ]]; then
     sandbox_check_jetson_cdi
 fi
 sandbox_check_ssh_authorized_keys
+sandbox_prepare_ssh_authorized_keys_mount
 sandbox_prepare_role_environment "$role"
 sandbox_prepare_host_podman
 sandbox_prepare_ssh_port
 
-compose_up_arguments=(up -d)
-if ((SANDBOX_HOST_PODMAN_ENABLED)); then
-    compose_up_arguments+=(--build)
-fi
+compose_up_arguments=(up -d --build)
 
 if ((${#EXTRA_MOUNT_SOURCES[@]})); then
     extra_mount_override=$(mktemp -- "${TMPDIR:-/tmp}/dev-sandbox-mounts.XXXXXX.yaml")

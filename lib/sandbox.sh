@@ -7,6 +7,7 @@ CONTAINER_NAME="dev-sandbox-$WORKSPACE_NAME"
 SANDBOX_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/dev-sandbox"
 SANDBOX_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dev-sandbox"
 SSH_AUTHORIZED_KEYS_FILE="${SANDBOX_SSH_AUTHORIZED_KEYS_FILE:-$SANDBOX_CONFIG_DIR/authorized_keys}"
+SSH_AUTHORIZED_KEYS_MOUNT_FILE="$SANDBOX_STATE_DIR/$CONTAINER_NAME.authorized-keys"
 SSH_IDENTITY_FILE="${SANDBOX_SSH_IDENTITY_FILE:-~/.ssh/dev-sandbox}"
 SSH_PORT_STATE_FILE="$SANDBOX_STATE_DIR/$CONTAINER_NAME.ssh-port"
 SANDBOX_METADATA_STATE_FILE="$SANDBOX_STATE_DIR/$CONTAINER_NAME.metadata"
@@ -484,6 +485,21 @@ EOF
     fi
 }
 
+sandbox_prepare_ssh_authorized_keys_mount() {
+    local temporary_file
+
+    install -d -m 0700 -- "$SANDBOX_STATE_DIR"
+    temporary_file=$(mktemp -- "$SANDBOX_STATE_DIR/.authorized-keys.XXXXXX")
+    if ! install -m 0644 -- "$SSH_AUTHORIZED_KEYS_FILE" "$temporary_file"; then
+        rm -f -- "$temporary_file"
+        return 1
+    fi
+    if ! mv -f -- "$temporary_file" "$SSH_AUTHORIZED_KEYS_MOUNT_FILE"; then
+        rm -f -- "$temporary_file"
+        return 1
+    fi
+}
+
 sandbox_default_ssh_host() {
     hostname -f 2>/dev/null || hostname
 }
@@ -563,6 +579,7 @@ sandbox_check_extra_mount_target() {
         /var/lib/dev-sandbox/ssh \
         /etc/ssh \
         /run/sshd \
+        /run/dev-sandbox/authorized_keys.source \
         /run/podman/podman.sock \
         /usr/local/sbin/dev-sandbox-sshd; do
         if sandbox_path_contains "$target" "$protected_target" ||
@@ -733,7 +750,7 @@ sandbox_compose() {
         SANDBOX_ROLE_RESOLVED="$role" \
         SANDBOX_PLATFORM_RESOLVED="$platform" \
         SANDBOX_SSH_PORT="${SSH_PORT:-2222}" \
-        SANDBOX_SSH_AUTHORIZED_KEYS_FILE="$SSH_AUTHORIZED_KEYS_FILE" \
+        SANDBOX_SSH_AUTHORIZED_KEYS_MOUNT_FILE="$SSH_AUTHORIZED_KEYS_MOUNT_FILE" \
         SANDBOX_XAUTHORITY_FILE="${SANDBOX_XAUTHORITY_FILE:-/dev/null}" \
         SANDBOX_HOST_PODMAN_SOCKET="${SANDBOX_HOST_PODMAN_SOCKET:-}" \
         DISPLAY="${DISPLAY:-}" \

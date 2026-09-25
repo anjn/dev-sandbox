@@ -21,7 +21,7 @@ services:
     volumes:
       - ${WORKSPACE_DIR}:/workspace
       - ${HOME}/.codex:/home/ubuntu/.codex
-      - ${SANDBOX_SSH_AUTHORIZED_KEYS_FILE}:/etc/dev-sandbox/authorized_keys:ro
+      - ${SANDBOX_SSH_AUTHORIZED_KEYS_MOUNT_FILE}:/run/dev-sandbox/authorized_keys.source:ro
       - ssh-host-keys:/var/lib/dev-sandbox/ssh
     environment:
       - TZ=Asia/Tokyo

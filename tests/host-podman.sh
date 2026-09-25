@@ -88,7 +88,7 @@ for compose_file in compose.rocm.yaml compose.jetson.yaml compose.ros2-tools-amd
         CONTAINER_NAME=dev-sandbox-check \
         WORKSPACE_DIR=/host/workspace \
         SANDBOX_SSH_PORT=22999 \
-        SANDBOX_SSH_AUTHORIZED_KEYS_FILE=/tmp/authorized_keys \
+        SANDBOX_SSH_AUTHORIZED_KEYS_MOUNT_FILE=/tmp/authorized_keys.mount \
         SANDBOX_XAUTHORITY_FILE=/dev/null \
         SANDBOX_HOST_PODMAN_SOCKET="$SOCKET_PATH" \
         podman-compose \
@@ -110,7 +110,7 @@ plain_config=$(
     CONTAINER_NAME=dev-sandbox-check \
     WORKSPACE_DIR=/host/workspace \
     SANDBOX_SSH_PORT=22999 \
-    SANDBOX_SSH_AUTHORIZED_KEYS_FILE=/tmp/authorized_keys \
+    SANDBOX_SSH_AUTHORIZED_KEYS_MOUNT_FILE=/tmp/authorized_keys.mount \
     podman-compose \
         --file compose.yaml \
         --file compose.rocm.yaml \

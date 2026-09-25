@@ -203,7 +203,7 @@ sudo ./setup-jetson-gpu-access
 
 ## SSH接続
 
-コンテナは公開鍵認証のSSH serverを起動します。秘密鍵は接続元だけに保持し、接続を許可する公開鍵をホストの`~/.config/dev-sandbox/authorized_keys`へ登録します。このファイルはすべてのworkspaceで共通です。
+コンテナは公開鍵認証のSSH serverを起動します。秘密鍵は接続元だけに保持し、接続を許可する公開鍵をホストの`~/.config/dev-sandbox/authorized_keys`へ登録します。このファイルはすべてのworkspaceで共通です。`up`は公開鍵のread-only mount用コピーを作成し、コンテナ起動時に`root:root`、mode `600`のファイルへコピーしてからSSH serverを起動します。これにより、ホストUIDがコンテナの`ubuntu`ユーザーと異なる環境でもOpenSSHの所有者検査を満たします。
 
 接続元に専用鍵がなければ、パスフレーズなしのEd25519鍵を作成します。
 
@@ -224,6 +224,8 @@ cat ~/.ssh/dev-sandbox.pub | \
   ssh user@jetson-host /path/to/dev-sandbox/add-ssh-key
 ```
 
+既存sandboxの起動後に公開鍵を追加・変更した場合は、そのworkspaceで`up`を再実行し、mount用コピーとコンテナ内のファイルを更新してください。
+
 `up`は`22000`-`22999`からworkspace用の空きポートを自動割り当て、SSHコマンドを表示します。同じworkspaceの再起動では同じポートを再利用します。
 
 ```bash
@@ -237,6 +239,13 @@ ssh -p 22000 -i ~/.ssh/dev-sandbox ubuntu@jetson-host
 
 ```bash
 SANDBOX_SSH_PORT=2222 /path/to/dev-sandbox/up
+```
+
+`~/.ssh/dev-sandbox`以外の秘密鍵を表示へ反映する場合は、`SANDBOX_SSH_IDENTITY_FILE`を指定します。
+
+```bash
+SANDBOX_SSH_IDENTITY_FILE=~/.ssh/id_agent \
+  /path/to/dev-sandbox/ssh-info jetson-host
 ```
 
 起動後のSSHポートやworkspaceをまとめて確認するには、任意のディレクトリから`status`を実行します。
