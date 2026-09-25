@@ -16,6 +16,8 @@ SSH_PORT_MAX=22999
 UP_HELP_REQUESTED=0
 SANDBOX_DISPLAY_ENABLED=0
 SANDBOX_XAUTHORITY_FILE=""
+SANDBOX_HOST_PODMAN_ENABLED=0
+SANDBOX_HOST_PODMAN_SOCKET=""
 EXTRA_MOUNT_SOURCES=()
 EXTRA_MOUNT_TARGETS=()
 EXTRA_MOUNT_MODES=()
@@ -147,6 +149,49 @@ sandbox_prepare_role_environment() {
             sandbox_prepare_display_environment required || return
             ;;
     esac
+}
+
+sandbox_prepare_host_podman() {
+    local socket
+
+    SANDBOX_HOST_PODMAN_ENABLED=0
+    SANDBOX_HOST_PODMAN_SOCKET=""
+
+    case "${SANDBOX_HOST_PODMAN:-0}" in
+        ""|0)
+            return
+            ;;
+        1)
+            ;;
+        *)
+            echo "Invalid SANDBOX_HOST_PODMAN: $SANDBOX_HOST_PODMAN (expected 0 or 1)" >&2
+            return 1
+            ;;
+    esac
+
+    socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/podman/podman.sock"
+    if [[ ! -S $socket || ! -w $socket ]]; then
+        cat >&2 <<EOF
+Host Podman API socket is unavailable: $socket
+Enable the rootless Podman socket, then retry:
+
+  systemctl --user enable --now podman.socket
+EOF
+        return 1
+    fi
+
+    if ! podman --remote --url "unix://$socket" info >/dev/null 2>&1; then
+        cat >&2 <<EOF
+Unable to connect to the host Podman API socket: $socket
+Check the user service, then retry:
+
+  systemctl --user status podman.socket podman.service
+EOF
+        return 1
+    fi
+
+    SANDBOX_HOST_PODMAN_ENABLED=1
+    SANDBOX_HOST_PODMAN_SOCKET=$socket
 }
 
 sandbox_check_jetson_cdi() {
@@ -476,11 +521,13 @@ The default access mode is rw. Use HOST::ro for a read-only same-path mount.
 Environment:
   SANDBOX_PLATFORM=rocm|jetson
   SANDBOX_ROLE=base|ros2-tools|ros2-rocm
+  SANDBOX_HOST_PODMAN=0|1
 
 Examples:
   $SANDBOX_DIR/up -v /data/models
   $SANDBOX_DIR/up -v /data/models:/models:ro
   $SANDBOX_DIR/up --volume=./cache:/cache:rw
+  SANDBOX_HOST_PODMAN=1 $SANDBOX_DIR/up
 EOF
 }
 
@@ -516,10 +563,11 @@ sandbox_check_extra_mount_target() {
         /var/lib/dev-sandbox/ssh \
         /etc/ssh \
         /run/sshd \
+        /run/podman/podman.sock \
         /usr/local/sbin/dev-sandbox-sshd; do
         if sandbox_path_contains "$target" "$protected_target" ||
             sandbox_path_contains "$protected_target" "$target"; then
-            echo "Extra mount target conflicts with the SSH runtime: $target" >&2
+            echo "Extra mount target conflicts with a managed runtime path: $target" >&2
             return 1
         fi
     done
@@ -670,6 +718,10 @@ sandbox_compose() {
             ;;
     esac
 
+    if ((SANDBOX_HOST_PODMAN_ENABLED)); then
+        compose_files+=(--file compose.host-podman.yaml)
+    fi
+
     if [[ -n ${SANDBOX_COMPOSE_OVERRIDE_FILE:-} ]]; then
         extra_files=(--file "$SANDBOX_COMPOSE_OVERRIDE_FILE")
     fi
@@ -683,6 +735,7 @@ sandbox_compose() {
         SANDBOX_SSH_PORT="${SSH_PORT:-2222}" \
         SANDBOX_SSH_AUTHORIZED_KEYS_FILE="$SSH_AUTHORIZED_KEYS_FILE" \
         SANDBOX_XAUTHORITY_FILE="${SANDBOX_XAUTHORITY_FILE:-/dev/null}" \
+        SANDBOX_HOST_PODMAN_SOCKET="${SANDBOX_HOST_PODMAN_SOCKET:-}" \
         DISPLAY="${DISPLAY:-}" \
         XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-}" \
         podman-compose \

@@ -53,6 +53,33 @@ cd /path/to/workspace
 SANDBOX_PLATFORM=jetson /path/to/dev-sandbox/up
 ```
 
+### ホストのPodmanをコンテナから使う
+
+ホストのrootless Podman API socketを共有すると、sandbox内の`podman`コマンドからホストのPodmanを操作できます。ホスト側でsocketを有効にしてから、明示的にopt-inしてsandboxを作成します。この場合、remote clientを確実に含めるため`up`はimageをbuildしてから起動します。
+
+```bash
+systemctl --user enable --now podman.socket
+
+cd /path/to/workspace
+SANDBOX_HOST_PODMAN=1 /path/to/dev-sandbox/up
+/path/to/dev-sandbox/exec podman info
+/path/to/dev-sandbox/exec podman ps
+```
+
+この設定で作成した停止中のsandboxは、通常どおりworkspaceから`start`を実行できます。`start`はホストsocketへ接続できることを確認してからコンテナを再起動します。
+
+> [!WARNING]
+> Podman APIを共有したsandboxは、ホストユーザーが所有するすべてのPodmanコンテナ、image、volumeを作成・変更・削除でき、ホスト上の任意のパスを新しいコンテナへmountできます。信頼できないコードには使用しないでください。sandbox自身を停止・削除する操作も可能です。
+
+remote Podmanのbind mount元はsandbox内ではなく、ホスト上のパスとして解釈されます。現在のworkspaceのホスト側パスは`SANDBOX_HOST_WORKSPACE`で参照できます。
+
+```bash
+/path/to/dev-sandbox/exec bash -lc \
+  'podman run --rm -v "$SANDBOX_HOST_WORKSPACE:/src:ro" IMAGE COMMAND'
+```
+
+socketが無効または到達不能なら`up`と`start`は起動前に停止し、必要な`systemctl --user`コマンドを表示します。共有を外すには、同じworkspaceで`SANDBOX_HOST_PODMAN`を指定せずに`up`を再実行してください。
+
 ### ディスプレイ出力
 
 通常の`rocm`/`jetson` sandboxでも、ホスト側に`DISPLAY`が設定されていて`/tmp/.X11-unix`が存在する場合は、X11 socketとXauthorityを自動でコンテナへ渡します。SSH接続ではなく、まず`exec`から表示確認するのが簡単です。

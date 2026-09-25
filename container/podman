@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [[ -x /usr/bin/podman-remote ]]; then
+    exec /usr/bin/podman-remote "$@"
+fi
+if [[ -x /usr/bin/podman ]]; then
+    exec /usr/bin/podman --remote "$@"
+fi
+
+echo "Podman remote client is not installed." >&2
+exit 127

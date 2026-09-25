@@ -14,6 +14,11 @@ EOF
     exit 1
 fi
 
+if [[ $(podman inspect --format '{{index .Config.Labels "io.github.anjn.dev-sandbox.host-podman"}}' "$CONTAINER_NAME") == true ]]; then
+    SANDBOX_HOST_PODMAN=1
+    sandbox_prepare_host_podman
+fi
+
 if [[ $(podman inspect --format '{{.State.Running}}' "$CONTAINER_NAME") == true ]]; then
     echo "$CONTAINER_NAME is already running."
 else

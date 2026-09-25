@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+apt-get update
+if apt-cache show podman-remote >/dev/null 2>&1; then
+    package=podman-remote
+else
+    package=podman
+fi
+DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y "$package"
+rm -rf /var/lib/apt/lists/*

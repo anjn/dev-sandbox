@@ -22,7 +22,13 @@ if [[ $role == base && $platform == jetson ]]; then
 fi
 sandbox_check_ssh_authorized_keys
 sandbox_prepare_role_environment "$role"
+sandbox_prepare_host_podman
 sandbox_prepare_ssh_port
+
+compose_up_arguments=(up -d)
+if ((SANDBOX_HOST_PODMAN_ENABLED)); then
+    compose_up_arguments+=(--build)
+fi
 
 if ((${#EXTRA_MOUNT_SOURCES[@]})); then
     extra_mount_override=$(mktemp -- "${TMPDIR:-/tmp}/dev-sandbox-mounts.XXXXXX.yaml")
@@ -33,9 +39,9 @@ if ((${#EXTRA_MOUNT_SOURCES[@]})); then
 
     sandbox_render_extra_mounts > "$extra_mount_override"
     SANDBOX_COMPOSE_OVERRIDE_FILE="$extra_mount_override" \
-        sandbox_compose "$platform" "$role" up -d
+        sandbox_compose "$platform" "$role" "${compose_up_arguments[@]}"
 else
-    sandbox_compose "$platform" "$role" up -d
+    sandbox_compose "$platform" "$role" "${compose_up_arguments[@]}"
 fi
 
 sandbox_write_metadata "$role" "$platform"

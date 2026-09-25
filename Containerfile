@@ -82,7 +82,11 @@ RUN apt-get update && \
 
 COPY container/sshd_config /etc/ssh/sshd_config.d/99-dev-sandbox.conf
 COPY container/start-sshd /usr/local/sbin/dev-sandbox-sshd
-RUN chmod 0755 /usr/local/sbin/dev-sandbox-sshd && \
+COPY container/install-podman-client /tmp/install-podman-client
+COPY container/podman /usr/local/bin/podman
+RUN bash /tmp/install-podman-client && \
+    rm -f /tmp/install-podman-client && \
+    chmod 0755 /usr/local/sbin/dev-sandbox-sshd /usr/local/bin/podman && \
     passwd -d ubuntu
 
 USER ubuntu

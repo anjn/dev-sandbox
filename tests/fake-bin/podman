@@ -3,6 +3,12 @@
 set -euo pipefail
 
 case "${1:-}" in
+    --remote)
+        printf '%s\n' "$*" >> "$FAKE_PODMAN_DATA/remote.log"
+        if [[ ${FAKE_PODMAN_REMOTE_FAIL:-0} == 1 ]]; then
+            exit 125
+        fi
+        ;;
     container)
         if [[ ${2:-} == exists && -f $FAKE_PODMAN_DATA/exists.${3:-} ]]; then
             exit 0
@@ -46,6 +52,11 @@ case "${1:-}" in
             exit 1
         }
         case "$format" in
+            '{{index .Config.Labels "io.github.anjn.dev-sandbox.host-podman"}}')
+                if [[ -f $FAKE_PODMAN_DATA/host-podman.$container_name ]]; then
+                    printf '%s\n' true
+                fi
+                ;;
             '{{.State.Running}}')
                 if [[ -f $FAKE_PODMAN_DATA/running.$container_name ]]; then
                     cat -- "$FAKE_PODMAN_DATA/running.$container_name"
