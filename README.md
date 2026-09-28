@@ -199,6 +199,8 @@ cd /path/to/dev-sandbox
 sudo ./setup-jetson-gpu-access
 ```
 
+Jetsonの`up`は起動前に既存GPU deviceのユーザー別ACLを確認します。ACLが不足している場合は必要なdeviceと上記コマンドを表示して停止します。
+
 詳しい原因、対象device、ロールバック方法は[ROCm rootless PodmanのGPU device権限](docs/rocm-rootless-gpu-access.md)または[Jetson rootless PodmanのGPU device権限](docs/jetson-rootless-gpu-access.md)を参照してください。
 
 ## SSH接続

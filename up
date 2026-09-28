@@ -19,6 +19,7 @@ if ((${#EXTRA_MOUNT_SOURCES[@]})); then
 fi
 if [[ $role == base && $platform == jetson ]]; then
     sandbox_check_jetson_cdi
+    sandbox_check_jetson_gpu_acl
 fi
 sandbox_check_ssh_authorized_keys
 sandbox_prepare_ssh_authorized_keys_mount

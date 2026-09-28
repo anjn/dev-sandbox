@@ -213,6 +213,55 @@ EOF
     return 1
 }
 
+sandbox_jetson_device_has_acl() {
+    local device=$1 required=$2 user_name=$3
+
+    getfacl -cp -- "$device" 2>/dev/null | awk -F: -v user_name="$user_name" -v required="$required" '
+        $1 == "user" && $2 == user_name { permissions = $3 }
+        $1 == "mask" && $2 == "" { mask = $3 }
+        END {
+            if (permissions == "") exit 1
+            for (i = 1; i <= length(required); i++) {
+                bit = substr(required, i, 1)
+                if (index(permissions, bit) == 0 || (mask != "" && index(mask, bit) == 0)) exit 1
+            }
+        }
+    '
+}
+
+sandbox_check_jetson_gpu_acl() {
+    local device user_name
+    local -a RW_DEVICES READ_DEVICES
+    local -a missing_devices=()
+
+    if ! command -v getfacl >/dev/null 2>&1; then
+        echo "Required command not found: getfacl (install the acl package)." >&2
+        return 1
+    fi
+
+    source "$SANDBOX_DIR/lib/jetson-gpu-devices.sh"
+    user_name=$(id -un)
+    for device in "${RW_DEVICES[@]}"; do
+        [[ -e $device ]] || continue
+        if ! sandbox_jetson_device_has_acl "$device" rw "$user_name"; then
+            missing_devices+=("$device")
+        fi
+    done
+    for device in "${READ_DEVICES[@]}"; do
+        [[ -e $device ]] || continue
+        if ! sandbox_jetson_device_has_acl "$device" r "$user_name"; then
+            missing_devices+=("$device")
+        fi
+    done
+
+    if ((${#missing_devices[@]})); then
+        printf 'Jetson GPU device ACL is missing or insufficient for %s on:\n' "$user_name" >&2
+        printf '  %s\n' "${missing_devices[@]}" >&2
+        printf 'Run the following host setup, then retry ./up:\n\n  cd %q\n  sudo ./setup-jetson-gpu-access\n' "$SANDBOX_DIR" >&2
+        return 1
+    fi
+}
+
 sandbox_validate_ssh_port() {
     local port=$1
 
