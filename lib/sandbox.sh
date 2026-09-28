@@ -257,7 +257,7 @@ sandbox_check_jetson_gpu_acl() {
     if ((${#missing_devices[@]})); then
         printf 'Jetson GPU device ACL is missing or insufficient for %s on:\n' "$user_name" >&2
         printf '  %s\n' "${missing_devices[@]}" >&2
-        printf 'Run the following host setup, then retry ./up:\n\n  cd %q\n  sudo ./setup-jetson-gpu-access\n' "$SANDBOX_DIR" >&2
+        printf 'Run the following host setup, then retry ./up:\n\n  sudo %q\n' "$SANDBOX_DIR/setup-jetson-gpu-access" >&2
         return 1
     fi
 }

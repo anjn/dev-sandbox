@@ -31,7 +31,11 @@ if sandbox_check_jetson_gpu_acl 2> "$TEST_ROOT/error"; then
     exit 1
 fi
 grep -Fq -- "$TEST_ROOT/rw-device" "$TEST_ROOT/error"
-grep -Fq -- 'sudo ./setup-jetson-gpu-access' "$TEST_ROOT/error"
+grep -Fq -- "sudo $TEST_ROOT/setup-jetson-gpu-access" "$TEST_ROOT/error"
+if grep -Fq -- '  cd ' "$TEST_ROOT/error"; then
+    echo "The setup instruction should be a single command" >&2
+    exit 1
+fi
 
 printf 'user:someone-else:rw-\nmask::rw-\n' > "$TEST_ROOT/rw-device.acl"
 if sandbox_check_jetson_gpu_acl >/dev/null 2>&1; then
