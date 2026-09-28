@@ -13,6 +13,8 @@ cd /path/to/workspace
 /path/to/dev-sandbox/down
 ```
 
+rootless Podmanを実行するホストユーザーは、コンテナ内の`ubuntu`（UID/GID 1000）に対応付けられます。ホスト側のUID/GIDが1000以外でも、`ubuntu`でworkspaceのファイルを編集できます。以前の`keep-id`で作成したコンテナには、`up`を再実行して新しいUID/GID対応を適用してください。
+
 `status`で`exited`になっている既存sandboxは、workspaceへ移動して`start`を実行すると、mount、環境変数、SSHポートなどの既存設定を変えずに再起動できます。
 
 ```bash

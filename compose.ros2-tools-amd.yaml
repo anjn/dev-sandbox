@@ -6,7 +6,6 @@ services:
     image: dev-sandbox-ros2-tools-amd
     command: sudo --preserve-env=SANDBOX_SSH_PORT,DISPLAY,XAUTHORITY,XDG_SESSION_TYPE /usr/local/sbin/dev-sandbox-sshd
     network_mode: host
-    userns_mode: keep-id
     ipc: host
     devices:
       - /dev/dri:/dev/dri

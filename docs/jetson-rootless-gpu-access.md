@@ -25,7 +25,7 @@ getfacl /dev/nvmap /dev/dri/renderD128 /dev/dri/renderD129
 
 ## 調査結果
 
-コンテナは`userns_mode: keep-id`、`group_add: keep-groups`、`seccomp=unconfined`で起動し、CDIの`nvidia.com/gpu=all`によって必要なdevice nodeがすべて割り当てられていました。SELinuxとAppArmorは有効ではありませんでした。
+当時のコンテナは`userns_mode: keep-id`、`group_add: keep-groups`、`seccomp=unconfined`で起動し、CDIの`nvidia.com/gpu=all`によって必要なdevice nodeがすべて割り当てられていました。SELinuxとAppArmorは有効ではありませんでした。
 
 ホストユーザーは`video`と`render`グループに所属し、対象nodeは主に次のownerとmodeでした。
 
@@ -36,7 +36,9 @@ root:render 0660  /dev/dri/renderD128
 root:render 0660  /dev/dri/renderD129
 ```
 
-`podman exec --user ubuntu`ではcrunの`run.oci.keep_original_groups=1`によってホストの補助グループが保持され、CUDA smoke testは成功しました。一方、実際のSSHログインではOpenSSHが`initgroups()`を実行します。コンテナ内のGID 44（`video`）とGID 104（`render`）はrootless user namespace内のIDへ変換され、ホストの実GID 44/104とは一致しないため、device nodeのgroup権限を利用できません。
+当時の`podman exec --user ubuntu`ではcrunの`run.oci.keep_original_groups=1`によってホストの補助グループが保持され、CUDA smoke testは成功しました。一方、実際のSSHログインではOpenSSHが`initgroups()`を実行します。コンテナ内のGID 44（`video`）とGID 104（`render`）はrootless user namespace内のIDへ変換され、ホストの実GID 44/104とは一致しないため、device nodeのgroup権限を利用できません。
+
+2026-09-28にはホストのPodman実行ユーザーがUID 2002の環境で、ACL適用後も`podman exec`が失敗しました。単なる`keep-id`ではホストUID 2002がコンテナUID 2002に対応し、コンテナの`ubuntu`（UID 1000）にはACLが適用されません。`keep-id:uid=1000,gid=1000`でホスト実行ユーザーを`ubuntu`へ割り当てた一時コンテナでは、`nvidia-smi`が成功しました。
 
 コンテナ内rootもホストrootではないため、コンテナ側からdevice nodeのownerやmodeは変更できません。`podman exec`で成功すること、CDI deviceがすべて展開されていること、および一時ACL適用後に同じコンテナで成功することから、CDI、cgroup device filter、SELinux、AppArmorは原因から除外しました。
 
@@ -63,7 +65,9 @@ sudo ./setup-jetson-gpu-access
 sudo ./setup-jetson-gpu-access amd
 ```
 
-スクリプトは対象ユーザーが`video`と`render`グループに所属することを確認し、`/etc/udev/rules.d/99-dev-sandbox-jetson-gpu-acl.rules`を生成します。既存deviceにも即座にACLを適用するため、コンテナの再作成は不要です。
+スクリプトは対象ユーザーが`video`と`render`グループに所属することを確認し、`/etc/udev/rules.d/99-dev-sandbox-jetson-gpu-acl.rules`を生成します。既存deviceにも即座にACLを適用します。
+
+以前の`userns_mode: keep-id`で作成したコンテナはUID対応が変わらないため、ホストUIDが1000以外なら`up`でコンテナを再作成してください。
 
 設定を確認します。
 

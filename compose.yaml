@@ -12,7 +12,7 @@ services:
       dockerfile: Containerfile
     command: sudo --preserve-env=SANDBOX_SSH_PORT /usr/local/sbin/dev-sandbox-sshd
     working_dir: /workspace
-    userns_mode: keep-id
+    userns_mode: keep-id:uid=1000,gid=1000
     ipc: host
     security_opt:
       - seccomp=unconfined

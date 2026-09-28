@@ -9,7 +9,6 @@ services:
     image: dev-sandbox-ros2-rocm-amd
     command: sudo --preserve-env=SANDBOX_SSH_PORT,DISPLAY,XAUTHORITY,XDG_SESSION_TYPE,XDG_RUNTIME_DIR /usr/local/sbin/dev-sandbox-sshd
     network_mode: host
-    userns_mode: keep-id
     ipc: host
     devices:
       - /dev/kfd:/dev/kfd

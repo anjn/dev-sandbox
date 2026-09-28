@@ -12,7 +12,7 @@ Unable to open /dev/kfd read-write: Permission denied
 
 ## 原因
 
-コンテナは`userns_mode: keep-id`と`group_add: keep-groups`で起動します。`podman exec`ではcrunの`run.oci.keep_original_groups=1`によってホストの補助グループが保持されるため、ホスト側の`render`グループに属する`/dev/kfd`や`/dev/dri/renderD*`を開けます。
+コンテナは`userns_mode: keep-id:uid=1000,gid=1000`と`group_add: keep-groups`で起動します。ホストのPodman実行ユーザーをコンテナ内の`ubuntu`（UID/GID 1000）に対応付けます。`podman exec`ではcrunの`run.oci.keep_original_groups=1`によってホストの補助グループが保持されるため、ホスト側の`render`グループに属する`/dev/kfd`や`/dev/dri/renderD*`を開けます。
 
 一方、SSHログインではOpenSSHがコンテナ内の`/etc/group`を使って`initgroups()`を実行します。rootless user namespaceでは、コンテナ内の`video`や`render`のGIDはホストdevice nodeの実GIDと一致しません。結果として、SSHログインしたユーザーはdevice nodeのgroup権限を利用できません。
 
