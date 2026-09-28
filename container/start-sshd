@@ -16,7 +16,7 @@ if [[ ! -s $authorized_keys_source ]]; then
     echo "SSH authorized_keys source is missing or empty: $authorized_keys_source" >&2
     exit 1
 fi
-install -o root -g root -m 0600 -- "$authorized_keys_source" "$authorized_keys"
+install -o ubuntu -g ubuntu -m 0600 -- "$authorized_keys_source" "$authorized_keys"
 
 host_key=/var/lib/dev-sandbox/ssh/ssh_host_ed25519_key
 if [[ ! -s $host_key ]]; then

@@ -48,7 +48,7 @@ config_output=$(
 [[ $config_output == *"$SSH_AUTHORIZED_KEYS_MOUNT_FILE:/run/dev-sandbox/authorized_keys.source:ro"* ]]
 [[ $config_output != *"$SSH_AUTHORIZED_KEYS_FILE:/etc/dev-sandbox/authorized_keys"* ]]
 
-grep -Fq -- 'install -o root -g root -m 0600 -- "$authorized_keys_source" "$authorized_keys"' \
+grep -Fq -- 'install -o ubuntu -g ubuntu -m 0600 -- "$authorized_keys_source" "$authorized_keys"' \
     "$REPOSITORY_DIR/container/start-sshd"
 
 echo "SSH authorized_keys tests passed"

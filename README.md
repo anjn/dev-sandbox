@@ -203,7 +203,7 @@ sudo ./setup-jetson-gpu-access
 
 ## SSH接続
 
-コンテナは公開鍵認証のSSH serverを起動します。秘密鍵は接続元だけに保持し、接続を許可する公開鍵をホストの`~/.config/dev-sandbox/authorized_keys`へ登録します。このファイルはすべてのworkspaceで共通です。`up`は公開鍵のread-only mount用コピーを作成し、コンテナ起動時に`root:root`、mode `600`のファイルへコピーしてからSSH serverを起動します。これにより、ホストUIDがコンテナの`ubuntu`ユーザーと異なる環境でもOpenSSHの所有者検査を満たします。
+コンテナは公開鍵認証のSSH serverを起動します。秘密鍵は接続元だけに保持し、接続を許可する公開鍵をホストの`~/.config/dev-sandbox/authorized_keys`へ登録します。このファイルはすべてのworkspaceで共通です。`up`は公開鍵のread-only mount用コピーを作成し、コンテナ起動時に`ubuntu:ubuntu`、mode `600`のファイルへコピーしてからSSH serverを起動します。これにより、ホストUIDがコンテナの`ubuntu`ユーザーと異なる環境でも、`ubuntu`による読み取りとOpenSSHの所有者検査を両立します。
 
 接続元に専用鍵がなければ、パスフレーズなしのEd25519鍵を作成します。
 
